@@ -52,6 +52,40 @@ async function getJson(url, headers) {
   return { ok: response.ok, status: response.status, body };
 }
 
+async function adobePhotoshopToken() {
+  if (process.env.ADOBE_PHOTOSHOP_ACCESS_TOKEN) {
+    return process.env.ADOBE_PHOTOSHOP_ACCESS_TOKEN;
+  }
+
+  const clientId = process.env.ADOBE_PHOTOSHOP_CLIENT_ID;
+  const clientSecret = process.env.ADOBE_PHOTOSHOP_CLIENT_SECRET;
+  if (!clientId || !clientSecret) return null;
+
+  const body = new URLSearchParams({
+    grant_type: "client_credentials",
+    client_id: clientId,
+    client_secret: clientSecret,
+    scope:
+      process.env.ADOBE_PHOTOSHOP_SCOPES?.trim() ||
+      "openid,AdobeID,read_organizations",
+  });
+
+  const response = await fetch("https://ims-na1.adobelogin.com/ims/token/v3", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+    redirect: "error",
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.access_token) {
+    throw new Error(
+      data.error_description || data.error || `Adobe IMS HTTP ${response.status}`,
+    );
+  }
+  return data.access_token;
+}
+
 async function canvaToken() {
   if (process.env.CANVA_ACCESS_TOKEN) return process.env.CANVA_ACCESS_TOKEN;
 
@@ -328,6 +362,34 @@ async function probeGoogle(kind) {
   };
 }
 
+async function probeAdobePhotoshop() {
+  const token = await adobePhotoshopToken();
+  const clientId = process.env.ADOBE_PHOTOSHOP_CLIENT_ID;
+
+  if (!token || !clientId) {
+    return { connector: "adobe-photoshop", state: "unconfigured" };
+  }
+
+  const result = await getJson("https://image.adobe.io/pie/psdService/hello", {
+    Authorization: `Bearer ${token}`,
+    "x-api-key": clientId,
+    Accept: "application/json, text/plain;q=0.9",
+    "User-Agent": "nexus-kit-openclaw",
+  });
+
+  return {
+    connector: "adobe-photoshop",
+    state: result.ok ? "read-verified" : "failed",
+    checks: [
+      {
+        endpoint: "/pie/psdService/hello",
+        ok: result.ok,
+        status: result.status,
+      },
+    ],
+  };
+}
+
 async function probeCanva() {
   const token = await canvaToken();
   if (!token) return { connector: "canva", state: "unconfigured" };
@@ -550,6 +612,7 @@ const probes = {
   zoom: probeZoom,
   figma: probeFigma,
   canva: probeCanva,
+  "adobe-photoshop": probeAdobePhotoshop,
 };
 
 const selected = target === "all" ? Object.keys(probes) : [target];
