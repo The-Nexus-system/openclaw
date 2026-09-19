@@ -10,6 +10,7 @@ import {
   linearGraphql,
   getZoomAccessToken,
   zoomTargetUser,
+  spotifyGet,
 } from "./shared.js";
 
 export function registerGeneralTools(api: OpenClawPluginApi) {
@@ -346,4 +347,36 @@ export function registerGeneralTools(api: OpenClawPluginApi) {
       },
     });
 
+
+    api.registerTool({
+      name: "nexus_spotify_read",
+      description:
+        "Read the independently authorized Spotify account through the official Web API. Supports profile and playlist reads without using the ChatGPT Spotify connector.",
+      parameters: Type.Object({
+        operation: Type.Union([
+          Type.Literal("me"),
+          Type.Literal("playlists"),
+        ]),
+        limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 50 })),
+      }),
+      async execute(_id, params) {
+        try {
+          const result =
+            params.operation === "me"
+              ? await spotifyGet("/me")
+              : await spotifyGet(
+                  `/me/playlists?limit=${params.limit ?? 20}`,
+                );
+
+          return {
+            content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return {
+            content: [{ type: "text", text: JSON.stringify({ ok: false, error: message }) }],
+          };
+        }
+      },
+    });
 }
