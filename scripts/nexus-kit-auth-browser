@@ -1,0 +1,202 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import base64
+import hashlib
+import json
+import os
+from pathlib import Path
+import secrets
+import tempfile
+import time
+import urllib.parse
+import sys
+
+from nexus_kit_secret_store import get
+
+PROVIDERS = {
+    "dropbox": {
+        "label": "Dropbox",
+        "client_id": "DROPBOX_APP_KEY",
+        "client_secret": "DROPBOX_APP_SECRET",
+        "redirect": "DROPBOX_REDIRECT_URI",
+        "authorize_url": "https://www.dropbox.com/oauth2/authorize",
+        "pkce": False,
+        "scopes": [],
+    },
+    "canva": {
+        "label": "Canva",
+        "client_id": "CANVA_CLIENT_ID",
+        "client_secret": "CANVA_CLIENT_SECRET",
+        "redirect": "CANVA_REDIRECT_URI",
+        "authorize_url": "https://www.canva.com/api/oauth/authorize",
+        "pkce": True,
+        "scopes": ["profile:read", "design:meta:read"],
+        "scope_secret": "CANVA_SCOPES",
+    },
+    "spotify": {
+        "label": "Spotify",
+        "client_id": "SPOTIFY_CLIENT_ID",
+        "client_secret": "SPOTIFY_CLIENT_SECRET",
+        "redirect": "SPOTIFY_REDIRECT_URI",
+        "authorize_url": "https://accounts.spotify.com/authorize",
+        "pkce": False,
+        "scopes": [
+            "user-read-private",
+            "playlist-read-private",
+            "playlist-modify-private",
+            "playlist-modify-public",
+            "user-library-read",
+        ],
+        "scope_secret": "SPOTIFY_SCOPES",
+    },
+    "zoom": {
+        "label": "Zoom",
+        "client_id": "ZOOM_CLIENT_ID",
+        "client_secret": "ZOOM_CLIENT_SECRET",
+        "redirect": "ZOOM_REDIRECT_URI",
+        "authorize_url": "https://zoom.us/oauth/authorize",
+        "pkce": False,
+        "scopes": [],
+    },
+}
+
+
+def b64url(value: bytes) -> str:
+    return base64.urlsafe_b64encode(value).decode("ascii").rstrip("=")
+
+
+def sha256_b64url(value: str) -> str:
+    return b64url(hashlib.sha256(value.encode("utf-8")).digest())
+
+
+def state_dir() -> Path:
+    raw = os.environ.get("NEXUS_KIT_OAUTH_STATE_DIR", "").strip()
+    return Path(raw).expanduser() if raw else Path.home() / ".openclaw" / "kit" / "oauth"
+
+
+def write_pending(provider: str, value: dict[str, object]) -> None:
+    directory = state_dir()
+    directory.mkdir(parents=True, exist_ok=True)
+    if os.name != "nt":
+        os.chmod(directory, 0o700)
+
+    fd, temp_name = tempfile.mkstemp(prefix=f".{provider}-pending-", dir=directory)
+    temp = Path(temp_name)
+    target = directory / f"{provider}-pending.json"
+    try:
+        if os.name != "nt":
+            os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            json.dump(value, stream, indent=2)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temp, target)
+        if os.name != "nt":
+            os.chmod(target, 0o600)
+    finally:
+        if temp.exists():
+            temp.unlink(missing_ok=True)
+
+
+def configured_scopes(config: dict[str, object]) -> list[str]:
+    scope_secret = config.get("scope_secret")
+    if isinstance(scope_secret, str):
+        override = get(scope_secret)
+        if override and override.strip():
+            return [item for item in override.replace(",", " ").split() if item]
+    value = config.get("scopes", [])
+    return [str(item) for item in value] if isinstance(value, list) else []
+
+
+def main() -> None:
+    if len(sys.argv) != 2 or sys.argv[1] not in PROVIDERS:
+        print(
+            "usage: nexus-kit-auth-browser dropbox|canva|spotify|zoom",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+
+    provider = sys.argv[1]
+    config = PROVIDERS[provider]
+    label = str(config["label"])
+    client_id_name = str(config["client_id"])
+    client_secret_name = str(config["client_secret"])
+    redirect_name = str(config["redirect"])
+
+    client_id = get(client_id_name)
+    client_secret = get(client_secret_name)
+    redirect_uri = get(redirect_name)
+
+    missing = [
+        name
+        for name, value in [
+            (client_id_name, client_id),
+            (client_secret_name, client_secret),
+            (redirect_name, redirect_uri),
+        ]
+        if not value
+    ]
+    if missing:
+        raise SystemExit(
+            f"{label} authorization is not ready. Missing: " + ", ".join(missing)
+        )
+
+    assert redirect_uri is not None
+    parsed = urllib.parse.urlparse(redirect_uri)
+    expected_path = f"/nexus-kit/oauth/{provider}/callback"
+    if parsed.scheme != "https" or not parsed.netloc:
+        raise SystemExit(f"{redirect_name} must be an absolute HTTPS URL.")
+    if parsed.path != expected_path:
+        raise SystemExit(
+            f"{redirect_name} path must be {expected_path} so it reaches the Nexus callback."
+        )
+
+    state = secrets.token_urlsafe(32)
+    use_pkce = bool(config.get("pkce"))
+    verifier = secrets.token_urlsafe(64) if use_pkce else None
+    challenge = sha256_b64url(verifier) if verifier else None
+
+    pending: dict[str, object] = {
+        "stateHash": sha256_b64url(state),
+        "redirectUri": redirect_uri,
+        "createdAt": int(time.time() * 1000),
+    }
+    if verifier:
+        pending["codeVerifier"] = verifier
+    write_pending(provider, pending)
+
+    query = {
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "state": state,
+    }
+
+    if provider == "dropbox":
+        query["token_access_type"] = "offline"
+
+    scopes = configured_scopes(config)
+    if scopes:
+        query["scope"] = " ".join(scopes)
+
+    if verifier and challenge:
+        query["code_challenge"] = challenge
+        query["code_challenge_method"] = "S256"
+
+    authorization_url = str(config["authorize_url"]) + "?" + urllib.parse.urlencode(query)
+
+    print(f"{label} authorization is ready.")
+    print()
+    print("Open this link in Safari:")
+    print(authorization_url)
+    print()
+    print(f"Approve {label} access.")
+    print("Do not copy an authorization code or token back into chat.")
+    print("The OpenClaw callback will store the refresh token directly.")
+    print("This authorization request expires in 15 minutes.")
+
+
+if __name__ == "__main__":
+    main()
