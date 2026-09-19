@@ -198,6 +198,24 @@ async function probeGoogle(kind) {
   };
 }
 
+async function probeNotion() {
+  const token = process.env.NOTION_TOKEN || process.env.NOTION_ACCESS_TOKEN;
+  if (!token) return { connector: "notion", state: "unconfigured" };
+
+  const result = await getJson("https://api.notion.com/v1/users/me", {
+    Authorization: `Bearer ${token}`,
+    "Notion-Version": process.env.NOTION_VERSION?.trim() || "2026-03-11",
+    Accept: "application/json",
+    "User-Agent": "nexus-kit-openclaw",
+  });
+
+  return {
+    connector: "notion",
+    state: result.ok ? "read-verified" : "failed",
+    checks: [{ endpoint: "/v1/users/me", ok: result.ok, status: result.status }],
+  };
+}
+
 async function probeDropbox() {
   const token = await dropboxToken();
   if (!token) return { connector: "dropbox", state: "unconfigured" };
@@ -274,6 +292,7 @@ const probes = {
   "google-contacts": () => probeGoogle("google-contacts"),
   "microsoft-graph": probeMicrosoft,
   dropbox: probeDropbox,
+  notion: probeNotion,
 };
 
 const selected = target === "all" ? Object.keys(probes) : [target];
