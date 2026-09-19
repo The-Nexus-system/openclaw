@@ -10,7 +10,13 @@ import {
   getZoomAccessToken,
   zoomTargetUser,
 } from "./shared.js";
-import { figmaHeaders } from "./creative-shared.js";
+import {
+  adobePhotoshopHeaders,
+  canvaHeaders,
+  figmaHeaders,
+  getAdobePhotoshopAccessToken,
+  getCanvaAccessToken,
+} from "./creative-shared.js";
 
 export function registerGeneralTools(api: OpenClawPluginApi) {
     api.registerTool({
@@ -99,6 +105,76 @@ export function registerGeneralTools(api: OpenClawPluginApi) {
       },
     });
 
+
+    api.registerTool({
+      name: "nexus_canva_read",
+      description:
+        "Read Canva through an independently authenticated OpenClaw route. Supports user identity/profile, design listing, and design metadata without using a ChatGPT connector.",
+      parameters: Type.Object({
+        operation: Type.Union([
+          Type.Literal("me"),
+          Type.Literal("profile"),
+          Type.Literal("designs"),
+          Type.Literal("design"),
+        ]),
+        designId: Type.Optional(Type.String()),
+      }),
+      async execute(_id, params) {
+        try {
+          const token = await getCanvaAccessToken();
+          const headers = canvaHeaders(token);
+
+          let url: string;
+          if (params.operation === "me") {
+            url = "https://api.canva.com/rest/v1/users/me";
+          } else if (params.operation === "profile") {
+            url = "https://api.canva.com/rest/v1/users/me/profile";
+          } else if (params.operation === "designs") {
+            url = "https://api.canva.com/rest/v1/designs";
+          } else {
+            const designId = params.designId?.trim();
+            if (!designId) throw new Error("designId is required for Canva design retrieval");
+            url = `https://api.canva.com/rest/v1/designs/${encodeURIComponent(designId)}`;
+          }
+
+          const result = await providerGet(url, headers);
+          return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return {
+            content: [{ type: "text", text: JSON.stringify({ ok: false, error: message }) }],
+          };
+        }
+      },
+    });
+
+    api.registerTool({
+      name: "nexus_adobe_photoshop_get",
+      description:
+        "Perform an independently authenticated read-only GET against the Adobe Photoshop/Firefly Services image API. Use provider-relative paths only. This does not use the ChatGPT Adobe connector.",
+      parameters: Type.Object({
+        path: Type.String({
+          description:
+            "Adobe image API provider-relative path such as /pie/psdService/hello or a documented status endpoint.",
+        }),
+      }),
+      async execute(_id, params) {
+        try {
+          const token = await getAdobePhotoshopAccessToken();
+          const apiPath = normalizeApiPath(params.path);
+          const result = await providerGet(
+            `https://image.adobe.io${apiPath}`,
+            adobePhotoshopHeaders(token),
+          );
+          return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return {
+            content: [{ type: "text", text: JSON.stringify({ ok: false, error: message }) }],
+          };
+        }
+      },
+    });
 
     api.registerTool({
       name: "nexus_figma_read",
