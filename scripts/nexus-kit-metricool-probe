@@ -1,0 +1,225 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+import queue
+import subprocess
+import sys
+import threading
+import time
+
+from nexus_kit_secret_store import get
+
+PROTOCOL_VERSION = "2025-06-18"
+
+
+def emit(value: dict[str, object]) -> None:
+    print(json.dumps(value, separators=(",", ":")))
+
+
+def oauth_cache_exists() -> bool:
+    root = Path.home() / ".openclaw" / "kit" / "mcp-auth" / "metricool"
+    if not root.exists():
+        return False
+    return any(root.rglob("*_tokens.json"))
+
+
+def reader(stream, output: queue.Queue[str | None]) -> None:
+    try:
+        for line in stream:
+            output.put(line.rstrip("\r\n"))
+    finally:
+        output.put(None)
+
+
+def send(proc: subprocess.Popen[str], message: dict[str, object]) -> None:
+    assert proc.stdin is not None
+    proc.stdin.write(json.dumps(message, separators=(",", ":")) + "\n")
+    proc.stdin.flush()
+
+
+def wait_for_id(
+    output: queue.Queue[str | None],
+    wanted_id: int,
+    timeout: float,
+) -> dict[str, object]:
+    deadline = time.monotonic() + timeout
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError(f"MCP response {wanted_id} timed out")
+        try:
+            line = output.get(timeout=remaining)
+        except queue.Empty as exc:
+            raise TimeoutError(f"MCP response {wanted_id} timed out") from exc
+        if line is None:
+            raise RuntimeError("Metricool MCP process closed before responding")
+        if not line.strip():
+            continue
+        try:
+            message = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(message, dict) and message.get("id") == wanted_id:
+            return message
+
+
+def exact_or_safe_brand_tool(tools: list[dict[str, object]]) -> str | None:
+    preferred = {
+        "get_brands",
+        "getbrandsettings",
+        "get_brand_settings",
+        "list_brands",
+    }
+    for tool in tools:
+        name = str(tool.get("name") or "")
+        if name.lower() in preferred:
+            return name
+
+    for tool in tools:
+        name = str(tool.get("name") or "")
+        lowered = name.lower()
+        if "brand" in lowered and lowered.startswith(("get", "list", "read")):
+            return name
+    return None
+
+
+def main() -> None:
+    if not get("METRICOOL_API_KEY") and not oauth_cache_exists():
+        emit({
+            "connector": "metricool",
+            "state": "unconfigured",
+            "reason": "No Metricool API key or completed mcp-remote OAuth cache is present.",
+        })
+        return
+
+    wrapper = Path(__file__).resolve().with_name("nexus-kit-mcp-metricool")
+    if not wrapper.exists():
+        emit({
+            "connector": "metricool",
+            "state": "failed",
+            "phase": "runtime",
+            "error": "Metricool MCP launcher is missing.",
+        })
+        raise SystemExit(1)
+
+    proc = subprocess.Popen(
+        [sys.executable, str(wrapper)],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=1,
+        env=os.environ.copy(),
+    )
+
+    assert proc.stdout is not None
+    assert proc.stderr is not None
+    stdout_queue: queue.Queue[str | None] = queue.Queue()
+    stderr_queue: queue.Queue[str | None] = queue.Queue()
+    threading.Thread(target=reader, args=(proc.stdout, stdout_queue), daemon=True).start()
+    threading.Thread(target=reader, args=(proc.stderr, stderr_queue), daemon=True).start()
+
+    try:
+        send(proc, {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": PROTOCOL_VERSION,
+                "capabilities": {},
+                "clientInfo": {
+                    "name": "nexus-kit-metricool-probe",
+                    "version": "1.0.0",
+                },
+            },
+        })
+        initialized = wait_for_id(stdout_queue, 1, 45)
+        if "error" in initialized:
+            raise RuntimeError("Metricool MCP rejected initialization")
+
+        send(proc, {
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized",
+            "params": {},
+        })
+
+        send(proc, {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/list",
+            "params": {},
+        })
+        listed = wait_for_id(stdout_queue, 2, 30)
+        if "error" in listed:
+            raise RuntimeError("Metricool MCP rejected tools/list")
+
+        result = listed.get("result")
+        tools = result.get("tools") if isinstance(result, dict) else None
+        if not isinstance(tools, list):
+            raise RuntimeError("Metricool MCP returned no tool list")
+
+        safe_tools = [tool for tool in tools if isinstance(tool, dict)]
+        brand_tool = exact_or_safe_brand_tool(safe_tools)
+        if not brand_tool:
+            emit({
+                "connector": "metricool",
+                "state": "failed",
+                "phase": "tool-discovery",
+                "toolCount": len(safe_tools),
+                "error": "Metricool connected, but no safe brand-list tool was found.",
+            })
+            raise SystemExit(1)
+
+        send(proc, {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {
+                "name": brand_tool,
+                "arguments": {},
+            },
+        })
+        called = wait_for_id(stdout_queue, 3, 30)
+        if "error" in called:
+            raise RuntimeError("Metricool brand read returned an MCP error")
+
+        call_result = called.get("result")
+        if isinstance(call_result, dict) and call_result.get("isError") is True:
+            raise RuntimeError("Metricool brand read reported an application error")
+
+        emit({
+            "connector": "metricool",
+            "state": "read-verified",
+            "checks": [
+                {"name": "mcp-tools-list", "ok": True},
+                {"name": "metricool-brands", "ok": True, "tool": brand_tool},
+            ],
+            "toolCount": len(safe_tools),
+        })
+    except Exception as exc:
+        emit({
+            "connector": "metricool",
+            "state": "failed",
+            "phase": "mcp",
+            "error": str(exc),
+        })
+        raise SystemExit(1)
+    finally:
+        try:
+            if proc.stdin:
+                proc.stdin.close()
+        except Exception:
+            pass
+        if proc.poll() is None:
+            proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+
+
+if __name__ == "__main__":
+    main()
