@@ -5,10 +5,13 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CLAWTEAM_REPO="https://github.com/The-Nexus-system/ClawTeam-OpenClaw.git"
 BASE_DIR="${NEXUS_KIT_HOME:-$HOME/.nexus-kit}"
 CLAWTEAM_DIR="$BASE_DIR/ClawTeam-OpenClaw"
-SKILL_DIR="$HOME/.openclaw/workspace/skills/clawteam"
+WORKSPACE_DIR="${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}"
+CLAWTEAM_SKILL_DIR="$WORKSPACE_DIR/skills/clawteam"
+CONNECTOR_SKILL_DIR="$WORKSPACE_DIR/skills/nexus-connectors"
+CONNECTOR_STATE_DIR="$HOME/.openclaw/kit"
 BIN_DIR="$HOME/bin"
 
-mkdir -p "$BASE_DIR" "$SKILL_DIR" "$BIN_DIR"
+mkdir -p "$BASE_DIR" "$CLAWTEAM_SKILL_DIR" "$CONNECTOR_SKILL_DIR" "$CONNECTOR_STATE_DIR" "$BIN_DIR"
 
 if [ -d "$CLAWTEAM_DIR/.git" ]; then
   git -C "$CLAWTEAM_DIR" fetch --prune origin
@@ -36,7 +39,13 @@ if [ -z "$CLAWTEAM_BIN" ]; then
 fi
 
 ln -sf "$CLAWTEAM_BIN" "$BIN_DIR/clawteam"
-cp "$CLAWTEAM_DIR/skills/openclaw/SKILL.md" "$SKILL_DIR/SKILL.md"
+cp "$CLAWTEAM_DIR/skills/openclaw/SKILL.md" "$CLAWTEAM_SKILL_DIR/SKILL.md"
+cp "$REPO_ROOT/skills/nexus-connectors/SKILL.md" "$CONNECTOR_SKILL_DIR/SKILL.md"
+
+if [ ! -f "$CONNECTOR_STATE_DIR/connectors.json" ]; then
+  cp "$REPO_ROOT/config/nexus-kit-connectors.example.json" "$CONNECTOR_STATE_DIR/connectors.json"
+  chmod 600 "$CONNECTOR_STATE_DIR/connectors.json" 2>/dev/null || true
+fi
 
 if command -v openclaw >/dev/null 2>&1; then
   openclaw approvals allowlist add --agent "*" "*/clawteam" >/dev/null 2>&1 || true
@@ -47,6 +56,10 @@ clawteam config health
 
 "$REPO_ROOT/scripts/nexus-kit-seed-workspace.sh"
 
+NEXUS_CONNECTOR_REGISTRY="$CONNECTOR_STATE_DIR/connectors.json"   "$REPO_ROOT/scripts/nexus-kit-connector-audit.sh" || true
+
 echo "Kit gateway integration ready."
 echo "OpenClaw remains the persistent gateway."
 echo "ClawTeam is installed and available for on-demand worker spawning."
+echo "Connector registry is present at $CONNECTOR_STATE_DIR/connectors.json."
+echo "Connector credentials are not stored in Git and must be configured independently."
