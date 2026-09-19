@@ -46,6 +46,7 @@ chmod 700 \
   "$REPO_ROOT/scripts/nexus-kit-auth" \
   "$REPO_ROOT/scripts/nexus-kit-auth-microsoft" \
   "$REPO_ROOT/scripts/nexus-kit-auth-google" \
+  "$REPO_ROOT/scripts/nexus-kit-auth-browser" \
   "$REPO_ROOT/scripts/nexus-kit-auth-app-store-connect" \
   "$REPO_ROOT/scripts/nexus-kit-auth-google-play" \
   "$REPO_ROOT/scripts/nexus-kit-secret" \
