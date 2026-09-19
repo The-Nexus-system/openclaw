@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   connectorSecretSource,
   getConnectorSecret,
+  getRotatingConnectorSecret,
   setConnectorSecret,
 } from "./connector-secrets.js";
 
@@ -41,13 +42,22 @@ describe("connector secret store", () => {
     }
   });
 
-  it("lets an environment value override the protected file", () => {
+  it("lets an environment value override the protected file for static secrets", () => {
     tempStore();
     setConnectorSecret("NEXUS_TEST_SECRET", "file-value");
     process.env.NEXUS_TEST_SECRET = "env-value";
 
     expect(getConnectorSecret("NEXUS_TEST_SECRET")).toBe("env-value");
     expect(connectorSecretSource("NEXUS_TEST_SECRET")).toBe("env");
+  });
+
+  it("lets a persisted rotated value override the bootstrap environment value", () => {
+    tempStore();
+    process.env.NEXUS_TEST_SECRET = "bootstrap-value";
+    setConnectorSecret("NEXUS_TEST_SECRET", "rotated-value");
+
+    expect(getRotatingConnectorSecret("NEXUS_TEST_SECRET")).toBe("rotated-value");
+    expect(getConnectorSecret("NEXUS_TEST_SECRET")).toBe("bootstrap-value");
   });
 
   it("rejects group or world-readable secret files on POSIX", () => {
