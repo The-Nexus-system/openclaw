@@ -39,6 +39,7 @@ const isolatedSecretFile = path.join(
   tmpdir(),
   `nexus-connectors-index-test-${process.pid}.json`,
 );
+const originalConnectorSecretFile = process.env.NEXUS_CONNECTOR_SECRETS_FILE;
 
 beforeEach(() => {
   rmSync(isolatedSecretFile, { force: true });
@@ -47,6 +48,11 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(isolatedSecretFile, { force: true });
+  if (originalConnectorSecretFile === undefined) {
+    delete process.env.NEXUS_CONNECTOR_SECRETS_FILE;
+  } else {
+    process.env.NEXUS_CONNECTOR_SECRETS_FILE = originalConnectorSecretFile;
+  }
 });
 
 function jsonResponse(body: unknown, status = 200) {
