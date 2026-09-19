@@ -49,6 +49,7 @@ chmod 700 \
   "$REPO_ROOT/scripts/nexus-kit-auth-browser" \
   "$REPO_ROOT/scripts/nexus-kit-auth-metricool" \
   "$REPO_ROOT/scripts/nexus-kit-mcp-metricool" \
+  "$REPO_ROOT/scripts/nexus-kit-metricool-probe" \
   "$REPO_ROOT/scripts/nexus-kit-auth-app-store-connect" \
   "$REPO_ROOT/scripts/nexus-kit-auth-google-play" \
   "$REPO_ROOT/scripts/nexus-kit-secret" \
@@ -58,6 +59,7 @@ ln -sf "$REPO_ROOT/scripts/nexus-kit-auth" "$BIN_DIR/nexus-kit-auth"
 ln -sf "$REPO_ROOT/scripts/nexus-kit-secret" "$BIN_DIR/nexus-kit-secret"
 ln -sf "$REPO_ROOT/scripts/nexus-kit-contact-health.sh" "$BIN_DIR/nexus-kit-contact-health"
 ln -sf "$REPO_ROOT/scripts/nexus-kit-mcp-metricool" "$BIN_DIR/nexus-kit-mcp-metricool"
+ln -sf "$REPO_ROOT/scripts/nexus-kit-metricool-probe" "$BIN_DIR/nexus-kit-metricool-probe"
 
 cp "$CLAWTEAM_DIR/skills/openclaw/SKILL.md" "$CLAWTEAM_SKILL_DIR/SKILL.md"
 cp "$REPO_ROOT/skills/nexus-connectors/SKILL.md" "$CONNECTOR_SKILL_DIR/SKILL.md"
