@@ -459,23 +459,4 @@ export function zoomTargetUser(mode: "direct" | "refresh" | "server-to-server", 
   }
   return "me";
 }
-export function figmaHeaders(): Record<string, string> {
-  const personalToken = process.env.FIGMA_TOKEN;
-  const oauthToken = process.env.FIGMA_ACCESS_TOKEN;
-
-  if (!personalToken && !oauthToken) {
-    throw new ConnectorProbeError(
-      "credentials",
-      "FIGMA_TOKEN or FIGMA_ACCESS_TOKEN must be configured on the OpenClaw host.",
-    );
-  }
-
-  return {
-    ...(oauthToken
-      ? { Authorization: `Bearer ${oauthToken}` }
-      : { "X-Figma-Token": personalToken! }),
-    Accept: "application/json",
-    "User-Agent": "nexus-kit-openclaw",
-  };
-}
 
