@@ -1,3 +1,6 @@
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import plugin from "./index.js";
 
@@ -35,6 +38,35 @@ function jsonResponse(body: unknown, status = 200) {
     headers: { "Content-Type": "application/json" },
   });
 }
+
+describe("nexus-connectors registration contract", () => {
+  it("registers the complete portable connector tool surface", () => {
+    const names = registerTools().map((tool) => tool.name);
+
+    expect(names).toEqual(
+      expect.arrayContaining([
+        "nexus_connector_status",
+        "nexus_connector_probe",
+        "nexus_github_get",
+        "nexus_digitalocean_get",
+        "nexus_google_get",
+        "nexus_gmail_send",
+        "nexus_microsoft_graph_get",
+        "nexus_outlook_send_mail",
+        "nexus_outlook_create_event",
+        "nexus_dropbox_read",
+        "nexus_notion_read",
+        "nexus_linear_read",
+        "nexus_zoom_read",
+        "nexus_figma_read",
+        "nexus_canva_read",
+        "nexus_adobe_photoshop_get",
+      ]),
+    );
+
+    expect(new Set(names).size).toBe(names.length);
+  });
+});
 
 describe("nexus-connectors Microsoft health probe", () => {
   const originalEnv = { ...process.env };
@@ -290,6 +322,7 @@ describe("nexus-connectors provider health probes", () => {
       "CANVA_CLIENT_SECRET",
       "CANVA_REFRESH_TOKEN",
       "CANVA_SECRET_STATE",
+      "NEXUS_KIT_SECRET_STATE_DIR",
     ]) {
       delete process.env[key];
     }
@@ -373,6 +406,51 @@ describe("nexus-connectors provider health probes", () => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
     },
   );
+
+  it("rotates Canva refresh tokens into protected private host state", async () => {
+    const stateDir = mkdtempSync(path.join(tmpdir(), "nexus-canva-test-"));
+    process.env.NEXUS_KIT_SECRET_STATE_DIR = stateDir;
+    process.env.CANVA_CLIENT_ID = "canva-client";
+    process.env.CANVA_CLIENT_SECRET = "canva-secret";
+    process.env.CANVA_REFRESH_TOKEN = "canva-refresh-original";
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+
+      if (url === "https://api.canva.com/rest/v1/oauth/token") {
+        expect(init?.method).toBe("POST");
+        return jsonResponse({
+          access_token: "canva-access",
+          refresh_token: "canva-refresh-rotated",
+          scope: "design:meta:read",
+        });
+      }
+
+      expect(url).toBe("https://api.canva.com/rest/v1/users/me");
+      expect((init?.headers as Record<string, string>).Authorization).toBe(
+        "Bearer canva-access",
+      );
+      return jsonResponse({ user: { id: "canva-user" } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      const tool = getTool("nexus_connector_probe");
+      const result = await tool.execute("test", { connector: "canva" });
+      const payload = JSON.parse(result.content[0].text);
+
+      expect(payload.readVerified).toBe(true);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+
+      const stored = JSON.parse(
+        readFileSync(path.join(stateDir, "canva.json"), "utf8"),
+      );
+      expect(stored.refresh_token).toBe("canva-refresh-rotated");
+      expect(stored.scope).toBe("design:meta:read");
+    } finally {
+      rmSync(stateDir, { recursive: true, force: true });
+    }
+  });
 
   it("keeps Figma unverified when the provider rejects the token", async () => {
     process.env.FIGMA_TOKEN = "figma-test";
