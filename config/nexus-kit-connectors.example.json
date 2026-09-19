@@ -408,25 +408,63 @@
       ]
     },
     {
-      "id": "adobe",
-      "provider": "Adobe",
+      "id": "adobe-photoshop",
+      "provider": "Adobe Photoshop / Firefly Services",
       "priority": 3,
       "routes": [
-        "oauth",
+        "adobe-ims-oauth",
+        "official-api",
+        "openclaw-plugin"
+      ],
+      "credentialEnv": [],
+      "credentialAlternatives": [
+        [
+          "ADOBE_PHOTOSHOP_ACCESS_TOKEN",
+          "ADOBE_PHOTOSHOP_CLIENT_ID"
+        ],
+        [
+          "ADOBE_PHOTOSHOP_CLIENT_ID",
+          "ADOBE_PHOTOSHOP_CLIENT_SECRET"
+        ]
+      ],
+      "optionalCredentialEnv": [
+        "ADOBE_PHOTOSHOP_SCOPES"
+      ],
+      "targetCapabilities": [
+        "creative.read",
+        "creative.write",
+        "image.jobs"
+      ],
+      "state": "planned",
+      "notes": [
+        "Live verification uses Adobe's documented Photoshop API hello endpoint.",
+        "Photoshop API v2 is the current production target; v1 is end-of-life."
+      ]
+    },
+    {
+      "id": "adobe-pdf-services",
+      "provider": "Adobe Acrobat PDF Services",
+      "priority": 3,
+      "routes": [
+        "client-credentials",
         "official-api",
         "openclaw-plugin"
       ],
       "credentialEnv": [
-        "ADOBE_CLIENT_ID",
-        "ADOBE_CLIENT_SECRET"
+        "ADOBE_PDF_CLIENT_ID",
+        "ADOBE_PDF_CLIENT_SECRET"
       ],
       "targetCapabilities": [
         "documents.read",
         "documents.write",
-        "creative.read",
-        "creative.write"
+        "pdf.create",
+        "pdf.export",
+        "pdf.compress",
+        "pdf.ocr",
+        "pdf.extract"
       ],
-      "state": "planned"
+      "state": "planned",
+      "verificationPolicy": "Token issuance proves authentication only. Do not mark read-verified or write-verified until a real PDF Services operation succeeds and its output is retrieved."
     }
   ]
 }
