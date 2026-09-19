@@ -24,3 +24,12 @@ Public Git must not contain private user memory, credentials, session transcript
 ## Recovery target
 
 A replacement host should be able to clone the public source, restore the private workspace and secrets, select an available model backend, verify tools, and resume from the latest durable handoff without rebuilding the system from scratch.
+
+
+## Connector portability
+
+ChatGPT plugins/connectors are treated as one access surface, not as the durable integration layer.
+
+External services that matter to Kit should have independently authenticated OpenClaw routes. Preserve provider capability and operating method, not hidden ChatGPT OAuth state.
+
+The Nexus connector registry, plugin, audit script, and parity map define this layer. Critical connectors are verified independently on the runtime host before they are treated as recovered after a migration.
