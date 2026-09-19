@@ -1,9 +1,11 @@
 import { Type } from "@sinclair/typebox";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/plugin-entry";
-import { providerGet } from "./shared.js";
+import { normalizeApiPath, providerGet } from "./shared.js";
 import {
+  adobePhotoshopHeaders,
   canvaHeaders,
   figmaHeaders,
+  getAdobePhotoshopAccessToken,
   getCanvaAccessToken,
 } from "./creative-shared.js";
 
@@ -77,6 +79,34 @@ api.registerTool({
               ? "https://api.canva.com/rest/v1/users/me/profile"
               : "https://api.canva.com/rest/v1/users/me";
           const result = await providerGet(url, canvaHeaders(token));
+          return {
+            content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return {
+            content: [{ type: "text", text: JSON.stringify({ ok: false, error: message }) }],
+          };
+        }
+      },
+    });    api.registerTool({
+      name: "nexus_adobe_photoshop_get",
+      description:
+        "Perform an independently authenticated read-only GET against the Adobe Photoshop/Firefly Services image API. Use provider-relative paths only. This does not use the ChatGPT Adobe connector.",
+      parameters: Type.Object({
+        path: Type.String({
+          description:
+            "Adobe image API provider-relative path such as /pie/psdService/hello or another documented read/status endpoint.",
+        }),
+      }),
+      async execute(_id, params) {
+        try {
+          const token = await getAdobePhotoshopAccessToken();
+          const apiPath = normalizeApiPath(params.path);
+          const result = await providerGet(
+            `https://image.adobe.io${apiPath}`,
+            adobePhotoshopHeaders(token),
+          );
           return {
             content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
           };
