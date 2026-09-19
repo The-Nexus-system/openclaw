@@ -10,7 +10,7 @@ import {
 } from "./creative-shared.js";
 
 export function registerCreativeTools(api: OpenClawPluginApi) {
-api.registerTool({
+  api.registerTool({
       name: "nexus_figma_read",
       description:
         "Read Figma through an independently authenticated OpenClaw route. Supports user identity, file content, file metadata, and comments without using a ChatGPT connector.",
@@ -64,20 +64,33 @@ api.registerTool({
     api.registerTool({
       name: "nexus_canva_read",
       description:
-        "Read Canva account identity/profile through an independently authenticated OpenClaw route without using a ChatGPT connector.",
+        "Read Canva through an independently authenticated OpenClaw route. Supports account identity/profile, design listing, and single-design metadata without using a ChatGPT connector.",
       parameters: Type.Object({
         operation: Type.Union([
           Type.Literal("me"),
           Type.Literal("profile"),
+          Type.Literal("designs"),
+          Type.Literal("design"),
         ]),
+        designId: Type.Optional(Type.String()),
       }),
       async execute(_id, params) {
         try {
           const token = await getCanvaAccessToken();
-          const url =
-            params.operation === "profile"
-              ? "https://api.canva.com/rest/v1/users/me/profile"
-              : "https://api.canva.com/rest/v1/users/me";
+          let url: string;
+          if (params.operation === "profile") {
+            url = "https://api.canva.com/rest/v1/users/me/profile";
+          } else if (params.operation === "designs") {
+            url = "https://api.canva.com/rest/v1/designs";
+          } else if (params.operation === "design") {
+            const designId = params.designId?.trim();
+            if (!designId) {
+              throw new Error("designId is required for Canva design retrieval");
+            }
+            url = `https://api.canva.com/rest/v1/designs/${encodeURIComponent(designId)}`;
+          } else {
+            url = "https://api.canva.com/rest/v1/users/me";
+          }
           const result = await providerGet(url, canvaHeaders(token));
           return {
             content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -89,7 +102,9 @@ api.registerTool({
           };
         }
       },
-    });    api.registerTool({
+    });
+
+    api.registerTool({
       name: "nexus_adobe_photoshop_get",
       description:
         "Perform an independently authenticated read-only GET against the Adobe Photoshop/Firefly Services image API. Use provider-relative paths only. This does not use the ChatGPT Adobe connector.",
