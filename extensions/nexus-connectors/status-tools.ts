@@ -140,6 +140,7 @@ export function registerStatusTools(api: OpenClawPluginApi) {
           Type.Literal("figma"),
           Type.Literal("canva"),
           Type.Literal("adobe-photoshop"),
+          Type.Literal("canva"),
         ]),
       }),
       async execute(_id, params) {
@@ -246,6 +247,21 @@ export function registerStatusTools(api: OpenClawPluginApi) {
               throw new ConnectorProbeError(
                 "account",
                 `Figma account probe failed with HTTP ${result.status}`,
+              );
+            }
+          }
+
+          if (params.connector === "canva") {
+            const token = await getCanvaAccessToken();
+            const result = await providerGet(
+              "https://api.canva.com/rest/v1/users/me",
+              canvaHeaders(token),
+            );
+            checks.push({ name: "canva-user", ok: result.ok, status: result.status });
+            if (!result.ok) {
+              throw new ConnectorProbeError(
+                "account",
+                `Canva user probe failed with HTTP ${result.status}`,
               );
             }
           }
