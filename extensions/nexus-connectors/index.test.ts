@@ -132,11 +132,12 @@ describe("nexus-connectors Microsoft health probe", () => {
     const payload = JSON.parse(result.content[0].text);
 
     expect(payload.readVerified).toBe(false);
-    expect(payload.checks).toContainEqual({
-      name: "outlook-calendar",
-      ok: false,
-      status: 403,
-    });
+    expect(payload.phase).toBe("calendar");
+    expect(payload.checks).toEqual([
+      { name: "graph-identity", ok: true, status: 200 },
+      { name: "outlook-mail", ok: true, status: 200 },
+      { name: "outlook-calendar", ok: false, status: 403 },
+    ]);
   });
 
   it("reports missing independent Microsoft credentials instead of claiming access", async () => {
@@ -147,6 +148,8 @@ describe("nexus-connectors Microsoft health probe", () => {
     const payload = JSON.parse(result.content[0].text);
 
     expect(payload.readVerified).toBe(false);
+    expect(payload.phase).toBe("credentials");
+    expect(payload.checks).toEqual([]);
     expect(payload.error).toContain("MICROSOFT_CLIENT_ID and MICROSOFT_REFRESH_TOKEN");
   });
 });
