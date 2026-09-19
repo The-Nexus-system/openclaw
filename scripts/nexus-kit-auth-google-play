@@ -1,0 +1,89 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+import stat
+
+from nexus_kit_secret_store import get, import_file, set_secret
+
+
+def validate_service_account_file(filename: str) -> None:
+    path = Path(filename).expanduser()
+    try:
+        st = path.lstat()
+    except FileNotFoundError as exc:
+        raise SystemExit("Google service-account file does not exist.") from exc
+
+    if stat.S_ISLNK(st.st_mode):
+        raise SystemExit("Refusing Google service-account credentials from a symbolic link.")
+    if not stat.S_ISREG(st.st_mode):
+        raise SystemExit("Google service-account credential must be a regular file.")
+    if st.st_size > 1024 * 1024:
+        raise SystemExit("Google service-account file is unexpectedly large.")
+
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise SystemExit("Google service-account file is not valid UTF-8 JSON.") from exc
+
+    if not isinstance(value, dict):
+        raise SystemExit("Google service-account JSON must contain an object.")
+    if value.get("type") != "service_account":
+        raise SystemExit("Google credential file is not a service-account credential.")
+    if not isinstance(value.get("client_email"), str) or not value["client_email"]:
+        raise SystemExit("Google service-account JSON is missing client_email.")
+    if not isinstance(value.get("private_key"), str) or "PRIVATE KEY" not in value["private_key"]:
+        raise SystemExit("Google service-account JSON is missing its private key.")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Prepare Kit's Google Play Android Publisher machine credential."
+    )
+    parser.add_argument("--service-account-file")
+    parser.add_argument("--package")
+    args = parser.parse_args()
+
+    print("Google Play machine authorization")
+    print("Preferred route: a service account already granted access to the app in Play Console.")
+    print("This command never asks for your Google account password.")
+    print()
+
+    if args.service_account_file:
+        credential_file = args.service_account_file
+    elif get("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON"):
+        credential_file = ""
+        print("Google Play service-account credential: already stored.")
+    else:
+        credential_file = input("Path to the downloaded Google service-account JSON file: ").strip()
+        if not credential_file:
+            raise SystemExit("No service-account file supplied.")
+
+    if credential_file:
+        validate_service_account_file(credential_file)
+        try:
+            import_file("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON", credential_file)
+        except (RuntimeError, ValueError) as exc:
+            raise SystemExit(str(exc)) from exc
+        print("Google Play service-account credential imported without displaying it.")
+
+    package = args.package.strip() if args.package else ""
+    if package:
+        set_secret("GOOGLE_PLAY_PACKAGE_NAME", package)
+    elif get("GOOGLE_PLAY_PACKAGE_NAME"):
+        print("Android package name: already stored.")
+    else:
+        package = input("Android package name, for example com.example.app: ").strip()
+        if not package:
+            raise SystemExit("Package name was empty.")
+        set_secret("GOOGLE_PLAY_PACKAGE_NAME", package)
+
+    print()
+    print("Google Play credential setup is ready for a live OpenClaw probe.")
+    print("The next verification must reach the real Android Publisher API for this package.")
+
+
+if __name__ == "__main__":
+    main()
