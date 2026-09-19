@@ -342,15 +342,31 @@
         "official-api",
         "openclaw-plugin"
       ],
-      "credentialEnv": [
-        "FIGMA_TOKEN"
-      ],
+      "credentialEnv": [],
       "targetCapabilities": [
         "files.read",
         "comments.read",
         "comments.write"
       ],
-      "state": "planned"
+      "state": "planned",
+      "credentialAlternatives": [
+        [
+          "FIGMA_TOKEN"
+        ],
+        [
+          "FIGMA_ACCESS_TOKEN"
+        ]
+      ],
+      "requiredReadScopes": [
+        "file_content:read",
+        "file_metadata:read"
+      ],
+      "optionalReadScopes": [
+        "file_comments:read"
+      ],
+      "notes": [
+        "Personal access tokens use X-Figma-Token; OAuth access tokens use Bearer authentication."
+      ]
     },
     {
       "id": "canva",
