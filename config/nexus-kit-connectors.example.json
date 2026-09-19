@@ -929,6 +929,232 @@
       "notes": [
         "Use native OpenClaw WhatsApp Web channel. Session credentials are linked runtime state rather than a normal API token and must be backed up privately/encrypted."
       ]
+    },
+    {
+      "id": "metricool",
+      "provider": "Metricool",
+      "priority": 2,
+      "routes": [
+        "official-api",
+        "browser-console-last-resort"
+      ],
+      "credentialEnv": [],
+      "credentialAlternatives": [
+        [
+          "METRICOOL_ACCESS_TOKEN"
+        ],
+        [
+          "METRICOOL_API_TOKEN"
+        ]
+      ],
+      "targetCapabilities": [
+        "brands.read",
+        "analytics.read",
+        "scheduled-content.read",
+        "scheduled-content.write",
+        "best-times.read"
+      ],
+      "state": "planned",
+      "notes": [
+        "Do not mark verified until a real Metricool account/brand read succeeds."
+      ]
+    },
+    {
+      "id": "speechify",
+      "provider": "Speechify",
+      "priority": 3,
+      "routes": [
+        "official-api",
+        "browser-console-last-resort"
+      ],
+      "credentialEnv": [
+        "SPEECHIFY_API_KEY"
+      ],
+      "targetCapabilities": [
+        "text-to-speech.create",
+        "voices.read",
+        "audio.generate"
+      ],
+      "state": "planned",
+      "notes": [
+        "Treat generated audio as an external provider operation; verify with a real harmless synthesis request before write-verified."
+      ]
+    },
+    {
+      "id": "soundbreak",
+      "provider": "SoundBreak",
+      "priority": 3,
+      "routes": [
+        "official-provider-route",
+        "browser-console-last-resort"
+      ],
+      "credentialEnv": [],
+      "credentialAlternatives": [
+        [
+          "SOUNDBREAK_ACCESS_TOKEN"
+        ],
+        [
+          "SOUNDBREAK_API_KEY"
+        ]
+      ],
+      "targetCapabilities": [
+        "music.search",
+        "music.generate",
+        "projects.read",
+        "projects.write"
+      ],
+      "state": "planned",
+      "notes": [
+        "Provider API/auth details must be verified before implementation; do not assume ChatGPT connector credentials are portable."
+      ]
+    },
+    {
+      "id": "buildy",
+      "provider": "Buildy",
+      "priority": 3,
+      "routes": [
+        "official-provider-route",
+        "browser-console-last-resort"
+      ],
+      "credentialEnv": [],
+      "credentialAlternatives": [
+        [
+          "BUILDY_ACCESS_TOKEN"
+        ],
+        [
+          "BUILDY_API_KEY"
+        ]
+      ],
+      "targetCapabilities": [
+        "apps.read",
+        "apps.create",
+        "apps.update",
+        "storage.read",
+        "storage.write"
+      ],
+      "state": "planned",
+      "notes": [
+        "Provider API/auth details must be verified before implementation."
+      ]
+    },
+    {
+      "id": "instacart",
+      "provider": "Instacart",
+      "priority": 3,
+      "routes": [
+        "official-api",
+        "browser-last-resort"
+      ],
+      "credentialEnv": [],
+      "credentialAlternatives": [
+        [
+          "INSTACART_ACCESS_TOKEN"
+        ],
+        [
+          "INSTACART_API_KEY"
+        ]
+      ],
+      "targetCapabilities": [
+        "shopping.read",
+        "shopping.write",
+        "retailers.read",
+        "products.read"
+      ],
+      "state": "planned",
+      "notes": [
+        "Do not infer consumer-account API parity from the ChatGPT connector; verify supported developer access first."
+      ]
+    },
+    {
+      "id": "uber",
+      "provider": "Uber",
+      "priority": 3,
+      "routes": [
+        "official-api",
+        "oauth",
+        "browser-last-resort"
+      ],
+      "credentialEnv": [],
+      "credentialAlternatives": [
+        [
+          "UBER_ACCESS_TOKEN"
+        ],
+        [
+          "UBER_CLIENT_ID",
+          "UBER_CLIENT_SECRET",
+          "UBER_REFRESH_TOKEN"
+        ]
+      ],
+      "targetCapabilities": [
+        "profile.read",
+        "rides.estimate",
+        "rides.read",
+        "rides.request"
+      ],
+      "state": "planned",
+      "notes": [
+        "Consequential ride requests remain separately gated even after read access is verified."
+      ]
+    },
+    {
+      "id": "uber-eats",
+      "provider": "Uber Eats",
+      "priority": 3,
+      "routes": [
+        "official-provider-route",
+        "oauth",
+        "browser-last-resort"
+      ],
+      "credentialEnv": [],
+      "credentialAlternatives": [
+        [
+          "UBER_EATS_ACCESS_TOKEN"
+        ],
+        [
+          "UBER_CLIENT_ID",
+          "UBER_CLIENT_SECRET",
+          "UBER_EATS_REFRESH_TOKEN"
+        ]
+      ],
+      "targetCapabilities": [
+        "restaurants.read",
+        "menus.read",
+        "orders.read",
+        "orders.create"
+      ],
+      "state": "planned",
+      "notes": [
+        "Consumer ordering access must be verified against current provider support before implementation; do not assume Marketplace/merchant APIs equal consumer-account access."
+      ]
+    },
+    {
+      "id": "replit",
+      "provider": "Replit",
+      "priority": 3,
+      "routes": [
+        "official-api-or-cli",
+        "browser-console-last-resort"
+      ],
+      "credentialEnv": [],
+      "credentialAlternatives": [
+        [
+          "REPLIT_ACCESS_TOKEN"
+        ],
+        [
+          "REPLIT_API_KEY"
+        ]
+      ],
+      "targetCapabilities": [
+        "projects.read",
+        "projects.write",
+        "deployments.read",
+        "deployments.write"
+      ],
+      "state": "planned",
+      "notes": [
+        "Standing Nexus boundary: do not access or mutate Replit unless explicitly requested in the current task.",
+        "Registry presence is continuity metadata only and does not authorize use."
+      ]
     }
   ]
 }
