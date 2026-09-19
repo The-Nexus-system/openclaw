@@ -11,13 +11,13 @@ describe("Canva OAuth refresh durability", () => {
 
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "nexus-canva-"));
-    secretPath = path.join(tempDir, "canva.json");
+    secretPath = path.join(tempDir, "connector-secrets.json");
 
+    process.env.NEXUS_CONNECTOR_SECRETS_FILE = secretPath;
     delete process.env.CANVA_ACCESS_TOKEN;
     process.env.CANVA_CLIENT_ID = "canva-client";
     process.env.CANVA_CLIENT_SECRET = "canva-secret";
     process.env.CANVA_REFRESH_TOKEN = "bootstrap-refresh";
-    process.env.CANVA_SECRET_STATE = secretPath;
   });
 
   afterEach(() => {
@@ -27,20 +27,25 @@ describe("Canva OAuth refresh durability", () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it("persists Canva's rotated refresh token and does not immediately reuse the one-use token", async () => {
+  it("uses the persisted rotated token instead of reusing the bootstrap environment token", async () => {
+    const refreshBodies: string[] = [];
+    let call = 0;
+
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       expect(String(input)).toBe("https://api.canva.com/rest/v1/oauth/token");
       expect(init?.method).toBe("POST");
       expect((init?.headers as Record<string, string>).Authorization).toMatch(/^Basic /);
-      expect(String(init?.body)).toContain("grant_type=refresh_token");
-      expect(String(init?.body)).toContain("refresh_token=bootstrap-refresh");
+
+      refreshBodies.push(String(init?.body));
+      call += 1;
 
       return new Response(
         JSON.stringify({
-          access_token: "fresh-access",
-          refresh_token: "rotated-refresh",
+          access_token: `fresh-access-${call}`,
+          refresh_token: `rotated-refresh-${call}`,
           expires_in: 14400,
           token_type: "Bearer",
+          scope: "design:meta:read",
         }),
         {
           status: 200,
@@ -51,16 +56,16 @@ describe("Canva OAuth refresh durability", () => {
 
     vi.stubGlobal("fetch", fetchMock);
 
-    const first = await getCanvaAccessToken();
-    const second = await getCanvaAccessToken();
+    expect(await getCanvaAccessToken()).toBe("fresh-access-1");
+    expect(await getCanvaAccessToken()).toBe("fresh-access-2");
 
-    expect(first).toBe("fresh-access");
-    expect(second).toBe("fresh-access");
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(refreshBodies[0]).toContain("refresh_token=bootstrap-refresh");
+    expect(refreshBodies[1]).toContain("refresh_token=rotated-refresh-1");
 
     const saved = JSON.parse(fs.readFileSync(secretPath, "utf8")) as {
-      refreshToken?: string;
+      CANVA_REFRESH_TOKEN?: string;
     };
-    expect(saved.refreshToken).toBe("rotated-refresh");
+    expect(saved.CANVA_REFRESH_TOKEN).toBe("rotated-refresh-2");
   });
 });
