@@ -18,6 +18,7 @@ PROVIDERS: dict[str, tuple[Path, list[str]]] = {
     "canva": (ROOT / "nexus-kit-auth-browser", ["canva"]),
     "spotify": (ROOT / "nexus-kit-auth-browser", ["spotify"]),
     "zoom": (ROOT / "nexus-kit-auth-browser", ["zoom"]),
+    "metricool": (ROOT / "nexus-kit-auth-metricool", []),
 }
 
 
