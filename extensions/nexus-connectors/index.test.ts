@@ -285,6 +285,11 @@ describe("nexus-connectors provider health probes", () => {
       "ZOOM_REFRESH_TOKEN",
       "ZOOM_ACCOUNT_ID",
       "ZOOM_USER_ID",
+      "CANVA_ACCESS_TOKEN",
+      "CANVA_CLIENT_ID",
+      "CANVA_CLIENT_SECRET",
+      "CANVA_REFRESH_TOKEN",
+      "CANVA_SECRET_STATE",
     ]) {
       delete process.env[key];
     }
@@ -303,6 +308,14 @@ describe("nexus-connectors provider health probes", () => {
       check: "figma-me",
       setup: () => {
         process.env.FIGMA_TOKEN = "figma-test";
+      },
+    },
+    {
+      connector: "canva",
+      expectedUrl: "https://api.canva.com/rest/v1/users/me",
+      check: "canva-user",
+      setup: () => {
+        process.env.CANVA_ACCESS_TOKEN = "canva-test";
       },
     },
     {
