@@ -2,6 +2,7 @@ import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import { registerCreativeTools } from "./creative-tools.js";
 import { registerGeneralTools } from "./general-tools.js";
 import { registerGoogleTools } from "./google-tools.js";
+import { registerGoogleOAuth } from "./google-oauth.js";
 import { registerMicrosoftTools } from "./microsoft-tools.js";
 import { registerStatusTools } from "./status-tools.js";
 export default definePluginEntry({
@@ -24,5 +25,6 @@ export default definePluginEntry({
     registerCreativeTools(api);
     registerMicrosoftTools(api);
     registerGoogleTools(api);
+    registerGoogleOAuth(api);
   },
 });
