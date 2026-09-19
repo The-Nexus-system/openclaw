@@ -206,9 +206,7 @@
         "official-api",
         "openclaw-plugin"
       ],
-      "credentialEnv": [
-        "NOTION_TOKEN"
-      ],
+      "credentialEnv": [],
       "targetCapabilities": [
         "search",
         "pages.read",
@@ -216,7 +214,19 @@
         "databases.read",
         "databases.write"
       ],
-      "state": "planned"
+      "state": "planned",
+      "credentialAlternatives": [
+        [
+          "NOTION_TOKEN"
+        ],
+        [
+          "NOTION_ACCESS_TOKEN"
+        ]
+      ],
+      "optionalCredentialEnv": [
+        "NOTION_VERSION"
+      ],
+      "defaultApiVersion": "2026-03-11"
     },
     {
       "id": "linear",
