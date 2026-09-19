@@ -11,144 +11,329 @@
       "id": "github",
       "provider": "GitHub",
       "priority": 1,
-      "routes": ["official-api", "gh-cli", "openclaw-plugin"],
-      "credentialEnv": ["GITHUB_TOKEN"],
-      "targetCapabilities": ["repos.read", "repos.write", "issues.read", "issues.write", "pulls.read", "pulls.write"],
+      "routes": [
+        "official-api",
+        "gh-cli",
+        "openclaw-plugin"
+      ],
+      "credentialEnv": [
+        "GITHUB_TOKEN"
+      ],
+      "targetCapabilities": [
+        "repos.read",
+        "repos.write",
+        "issues.read",
+        "issues.write",
+        "pulls.read",
+        "pulls.write"
+      ],
       "state": "planned"
     },
     {
       "id": "gmail",
       "provider": "Google",
       "priority": 1,
-      "routes": ["google-oauth", "official-api", "openclaw-plugin"],
-      "credentialEnv": ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"],
-      "targetCapabilities": ["mail.search", "mail.read", "mail.send", "mail.modify"],
+      "routes": [
+        "google-oauth",
+        "official-api",
+        "openclaw-plugin"
+      ],
+      "credentialEnv": [
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_SECRET",
+        "GOOGLE_REFRESH_TOKEN"
+      ],
+      "targetCapabilities": [
+        "mail.search",
+        "mail.read",
+        "mail.send",
+        "mail.modify"
+      ],
       "state": "planned"
     },
     {
       "id": "google-calendar",
       "provider": "Google",
       "priority": 1,
-      "routes": ["google-oauth", "official-api", "openclaw-plugin"],
-      "credentialEnv": ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"],
-      "targetCapabilities": ["calendar.read", "calendar.write"],
+      "routes": [
+        "google-oauth",
+        "official-api",
+        "openclaw-plugin"
+      ],
+      "credentialEnv": [
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_SECRET",
+        "GOOGLE_REFRESH_TOKEN"
+      ],
+      "targetCapabilities": [
+        "calendar.read",
+        "calendar.write"
+      ],
       "state": "planned"
     },
     {
       "id": "google-drive",
       "provider": "Google",
       "priority": 1,
-      "routes": ["google-oauth", "official-api", "openclaw-plugin"],
-      "credentialEnv": ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"],
-      "targetCapabilities": ["drive.search", "drive.read", "drive.write"],
+      "routes": [
+        "google-oauth",
+        "official-api",
+        "openclaw-plugin"
+      ],
+      "credentialEnv": [
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_SECRET",
+        "GOOGLE_REFRESH_TOKEN"
+      ],
+      "targetCapabilities": [
+        "drive.search",
+        "drive.read",
+        "drive.write"
+      ],
       "state": "planned"
     },
     {
       "id": "google-contacts",
       "provider": "Google",
       "priority": 2,
-      "routes": ["google-oauth", "official-api", "openclaw-plugin"],
-      "credentialEnv": ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"],
-      "targetCapabilities": ["contacts.search", "contacts.read"],
+      "routes": [
+        "google-oauth",
+        "official-api",
+        "openclaw-plugin"
+      ],
+      "credentialEnv": [
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_SECRET",
+        "GOOGLE_REFRESH_TOKEN"
+      ],
+      "targetCapabilities": [
+        "contacts.search",
+        "contacts.read"
+      ],
       "state": "planned"
     },
     {
       "id": "digitalocean",
       "provider": "DigitalOcean",
       "priority": 1,
-      "routes": ["official-api", "doctl-cli", "openclaw-plugin"],
-      "credentialEnv": ["DIGITALOCEAN_ACCESS_TOKEN"],
-      "targetCapabilities": ["account.read", "droplets.read", "droplets.write", "network.read"],
+      "routes": [
+        "official-api",
+        "doctl-cli",
+        "openclaw-plugin"
+      ],
+      "credentialEnv": [
+        "DIGITALOCEAN_ACCESS_TOKEN"
+      ],
+      "targetCapabilities": [
+        "account.read",
+        "droplets.read",
+        "droplets.write",
+        "network.read"
+      ],
       "state": "planned"
     },
     {
       "id": "microsoft-graph",
       "provider": "Microsoft",
       "priority": 2,
-      "routes": ["microsoft-oauth", "official-api", "openclaw-plugin"],
-      "credentialEnv": ["MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET", "MICROSOFT_TENANT_ID", "MICROSOFT_REFRESH_TOKEN"],
-      "targetCapabilities": ["mail.read", "mail.send", "mail.modify", "calendar.read", "calendar.write"],
-      "state": "planned"
+      "routes": [
+        "microsoft-oauth",
+        "official-api",
+        "openclaw-plugin"
+      ],
+      "credentialEnv": [
+        "MICROSOFT_CLIENT_ID",
+        "MICROSOFT_REFRESH_TOKEN"
+      ],
+      "targetCapabilities": [
+        "mail.read",
+        "mail.send",
+        "mail.modify",
+        "calendar.read",
+        "calendar.write"
+      ],
+      "state": "planned",
+      "optionalCredentialEnv": [
+        "MICROSOFT_CLIENT_SECRET",
+        "MICROSOFT_TENANT_ID",
+        "MICROSOFT_SCOPES"
+      ]
     },
     {
       "id": "dropbox",
       "provider": "Dropbox",
       "priority": 2,
-      "routes": ["oauth", "official-api", "openclaw-plugin"],
-      "credentialEnv": ["DROPBOX_APP_KEY", "DROPBOX_APP_SECRET"],
-      "targetCapabilities": ["files.search", "files.read", "files.write"],
+      "routes": [
+        "oauth",
+        "official-api",
+        "openclaw-plugin"
+      ],
+      "credentialEnv": [
+        "DROPBOX_APP_KEY",
+        "DROPBOX_APP_SECRET"
+      ],
+      "targetCapabilities": [
+        "files.search",
+        "files.read",
+        "files.write"
+      ],
       "state": "planned"
     },
     {
       "id": "notion",
       "provider": "Notion",
       "priority": 2,
-      "routes": ["oauth", "official-api", "openclaw-plugin"],
-      "credentialEnv": ["NOTION_TOKEN"],
-      "targetCapabilities": ["search", "pages.read", "pages.write", "databases.read", "databases.write"],
+      "routes": [
+        "oauth",
+        "official-api",
+        "openclaw-plugin"
+      ],
+      "credentialEnv": [
+        "NOTION_TOKEN"
+      ],
+      "targetCapabilities": [
+        "search",
+        "pages.read",
+        "pages.write",
+        "databases.read",
+        "databases.write"
+      ],
       "state": "planned"
     },
     {
       "id": "linear",
       "provider": "Linear",
       "priority": 2,
-      "routes": ["oauth", "official-api", "openclaw-plugin"],
-      "credentialEnv": ["LINEAR_API_KEY"],
-      "targetCapabilities": ["issues.read", "issues.write", "projects.read", "projects.write"],
+      "routes": [
+        "oauth",
+        "official-api",
+        "openclaw-plugin"
+      ],
+      "credentialEnv": [
+        "LINEAR_API_KEY"
+      ],
+      "targetCapabilities": [
+        "issues.read",
+        "issues.write",
+        "projects.read",
+        "projects.write"
+      ],
       "state": "planned"
     },
     {
       "id": "zoom",
       "provider": "Zoom",
       "priority": 3,
-      "routes": ["oauth", "official-api", "openclaw-plugin"],
-      "credentialEnv": ["ZOOM_CLIENT_ID", "ZOOM_CLIENT_SECRET"],
-      "targetCapabilities": ["meetings.read", "recordings.read"],
+      "routes": [
+        "oauth",
+        "official-api",
+        "openclaw-plugin"
+      ],
+      "credentialEnv": [
+        "ZOOM_CLIENT_ID",
+        "ZOOM_CLIENT_SECRET"
+      ],
+      "targetCapabilities": [
+        "meetings.read",
+        "recordings.read"
+      ],
       "state": "planned"
     },
     {
       "id": "spotify",
       "provider": "Spotify",
       "priority": 3,
-      "routes": ["oauth", "official-api", "openclaw-plugin"],
-      "credentialEnv": ["SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET"],
-      "targetCapabilities": ["library.read", "playlists.read", "playlists.write"],
+      "routes": [
+        "oauth",
+        "official-api",
+        "openclaw-plugin"
+      ],
+      "credentialEnv": [
+        "SPOTIFY_CLIENT_ID",
+        "SPOTIFY_CLIENT_SECRET"
+      ],
+      "targetCapabilities": [
+        "library.read",
+        "playlists.read",
+        "playlists.write"
+      ],
       "state": "planned"
     },
     {
       "id": "apple-music",
       "provider": "Apple Music",
       "priority": 3,
-      "routes": ["musickit", "host-local-bridge"],
-      "credentialEnv": ["APPLE_MUSIC_DEVELOPER_TOKEN"],
-      "targetCapabilities": ["catalog.search", "library.read", "playlists.write"],
+      "routes": [
+        "musickit",
+        "host-local-bridge"
+      ],
+      "credentialEnv": [
+        "APPLE_MUSIC_DEVELOPER_TOKEN"
+      ],
+      "targetCapabilities": [
+        "catalog.search",
+        "library.read",
+        "playlists.write"
+      ],
       "state": "planned"
     },
     {
       "id": "figma",
       "provider": "Figma",
       "priority": 3,
-      "routes": ["oauth", "official-api", "openclaw-plugin"],
-      "credentialEnv": ["FIGMA_TOKEN"],
-      "targetCapabilities": ["files.read", "comments.read", "comments.write"],
+      "routes": [
+        "oauth",
+        "official-api",
+        "openclaw-plugin"
+      ],
+      "credentialEnv": [
+        "FIGMA_TOKEN"
+      ],
+      "targetCapabilities": [
+        "files.read",
+        "comments.read",
+        "comments.write"
+      ],
       "state": "planned"
     },
     {
       "id": "canva",
       "provider": "Canva",
       "priority": 3,
-      "routes": ["oauth", "official-api", "openclaw-plugin"],
-      "credentialEnv": ["CANVA_CLIENT_ID", "CANVA_CLIENT_SECRET"],
-      "targetCapabilities": ["designs.read", "designs.write"],
+      "routes": [
+        "oauth",
+        "official-api",
+        "openclaw-plugin"
+      ],
+      "credentialEnv": [
+        "CANVA_CLIENT_ID",
+        "CANVA_CLIENT_SECRET"
+      ],
+      "targetCapabilities": [
+        "designs.read",
+        "designs.write"
+      ],
       "state": "planned"
     },
     {
       "id": "adobe",
       "provider": "Adobe",
       "priority": 3,
-      "routes": ["oauth", "official-api", "openclaw-plugin"],
-      "credentialEnv": ["ADOBE_CLIENT_ID", "ADOBE_CLIENT_SECRET"],
-      "targetCapabilities": ["documents.read", "documents.write", "creative.read", "creative.write"],
+      "routes": [
+        "oauth",
+        "official-api",
+        "openclaw-plugin"
+      ],
+      "credentialEnv": [
+        "ADOBE_CLIENT_ID",
+        "ADOBE_CLIENT_SECRET"
+      ],
+      "targetCapabilities": [
+        "documents.read",
+        "documents.write",
+        "creative.read",
+        "creative.write"
+      ],
       "state": "planned"
     }
   ]
