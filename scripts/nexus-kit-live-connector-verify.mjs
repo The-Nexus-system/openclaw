@@ -198,6 +198,45 @@ async function probeGoogle(kind) {
   };
 }
 
+async function probeLinear() {
+  const apiKey = process.env.LINEAR_API_KEY;
+  const accessToken = process.env.LINEAR_ACCESS_TOKEN;
+  if (!apiKey && !accessToken) {
+    return { connector: "linear", state: "unconfigured" };
+  }
+
+  const response = await fetch("https://api.linear.app/graphql", {
+    method: "POST",
+    headers: {
+      Authorization: accessToken ? `Bearer ${accessToken}` : apiKey,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "User-Agent": "nexus-kit-openclaw",
+    },
+    body: JSON.stringify({
+      query: "query NexusKitViewer { viewer { id name email } }",
+    }),
+    redirect: "error",
+  });
+
+  const body = await response.json().catch(() => ({}));
+  const graphqlErrors = Array.isArray(body?.errors) ? body.errors : [];
+  const ok = response.ok && graphqlErrors.length === 0 && Boolean(body?.data?.viewer?.id);
+
+  return {
+    connector: "linear",
+    state: ok ? "read-verified" : "failed",
+    checks: [
+      {
+        endpoint: "GraphQL viewer",
+        ok,
+        status: response.status,
+        graphqlErrorCount: graphqlErrors.length,
+      },
+    ],
+  };
+}
+
 async function probeNotion() {
   const token = process.env.NOTION_TOKEN || process.env.NOTION_ACCESS_TOKEN;
   if (!token) return { connector: "notion", state: "unconfigured" };
@@ -293,6 +332,7 @@ const probes = {
   "microsoft-graph": probeMicrosoft,
   dropbox: probeDropbox,
   notion: probeNotion,
+  linear: probeLinear,
 };
 
 const selected = target === "all" ? Object.keys(probes) : [target];
