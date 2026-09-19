@@ -34,7 +34,7 @@ Google does not permit the limited-input/device flow for the full Gmail/Calendar
 
 Kit therefore provides:
 
-`nexus_google_oauth_start`
+`nexus-kit-auth google`
 
 This generates a short-lived PKCE authorization URL. The user opens it in Safari and approves access. Google redirects to Kit's registered HTTPS callback, and the callback stores the refresh token directly.
 
@@ -138,6 +138,40 @@ Store:
 The main `TWILIO_AUTH_TOKEN` remains a fallback.
 
 Kit verifies access by reading the actual Twilio account resource.
+
+## Metricool
+
+Primary route: Metricool's official remote MCP endpoint through the OpenClaw stdio bridge.
+
+Use:
+
+`nexus-kit-auth metricool`
+
+The auth helper tries headless OAuth device authorization through the pinned `mcp-remote` client. Device authorization is accepted only when Metricool's authorization metadata actually advertises RFC 8628 support. If the provider does not advertise it, setup fails closed rather than falling back to an invisible browser on the VPS.
+
+Optional fallback:
+
+`nexus-kit-auth metricool --api-key`
+
+This stores a Metricool API key in the protected connector vault and supplies it to the remote MCP as `X-Mc-Auth`. Treat this as a fallback because Metricool API-key availability may depend on plan, while Metricool's OAuth MCP route is the normal any-plan path.
+
+OAuth client/token state from `mcp-remote` lives under:
+
+`~/.openclaw/kit/mcp-auth/metricool`
+
+That directory is private runtime state. It must never be committed to Git and must be included in encrypted recovery backups.
+
+Production OpenClaw uses:
+
+`nexus-kit-mcp-metricool`
+
+The production wrapper refuses to begin a first-time authorization flow in the background. If neither a usable private OAuth cache nor API key exists, it tells the operator to run `nexus-kit-auth metricool`.
+
+Live verification uses:
+
+`nexus-kit-metricool-probe`
+
+The probe launches the same production MCP wrapper, initializes MCP, lists the real Metricool tools, locates a read-only brand-list tool, and calls it. It never prints returned brand/account data. Metricool is read-verified only when that real account read succeeds.
 
 ## Secret-file accessibility rule
 
