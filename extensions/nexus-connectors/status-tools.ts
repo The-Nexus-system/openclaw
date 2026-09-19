@@ -1,5 +1,6 @@
 import { Type } from "@sinclair/typebox";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/plugin-entry";
+import type { ConnectorRegistry } from "./shared.js";
 import {
   resolveRegistryPath,
   loadRegistry,
