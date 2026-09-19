@@ -14,6 +14,7 @@ import {
   linearGraphql,
   getZoomAccessToken,
   zoomTargetUser,
+  runExpoProjectRead,
 } from "./shared.js";
 import {
   adobePhotoshopHeaders,
@@ -144,6 +145,7 @@ export function registerStatusTools(api: OpenClawPluginApi) {
           Type.Literal("figma"),
           Type.Literal("canva"),
           Type.Literal("adobe-photoshop"),
+          Type.Literal("expo-eas"),
         ]),
       }),
       async execute(_id, params) {
@@ -323,6 +325,17 @@ export function registerStatusTools(api: OpenClawPluginApi) {
               throw new ConnectorProbeError(
                 "account",
                 `Dropbox account probe failed with HTTP ${result.status}`,
+              );
+            }
+          }
+
+          if (params.connector === "expo-eas") {
+            const result = await runExpoProjectRead("status", 1);
+            checks.push({ name: "expo-project-status", ok: result.ok, status: result.status });
+            if (!result.ok) {
+              throw new ConnectorProbeError(
+                "project",
+                `Expo EAS project probe failed with status ${result.status}`,
               );
             }
           }
