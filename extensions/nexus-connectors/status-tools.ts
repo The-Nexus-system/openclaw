@@ -16,8 +16,10 @@ import {
 } from "./shared.js";
 import {
   adobePhotoshopHeaders,
+  canvaHeaders,
   figmaHeaders,
   getAdobePhotoshopAccessToken,
+  getCanvaAccessToken,
 } from "./creative-shared.js";
 
 export function registerStatusTools(api: OpenClawPluginApi) {
@@ -136,6 +138,7 @@ export function registerStatusTools(api: OpenClawPluginApi) {
           Type.Literal("linear"),
           Type.Literal("zoom"),
           Type.Literal("figma"),
+          Type.Literal("canva"),
           Type.Literal("adobe-photoshop"),
         ]),
       }),
@@ -215,6 +218,21 @@ export function registerStatusTools(api: OpenClawPluginApi) {
                 headers,
               );
               checks.push({ name: "people-me", ok: result.ok, status: result.status });
+            }
+          }
+
+          if (params.connector === "canva") {
+            const token = await getCanvaAccessToken();
+            const result = await providerGet(
+              "https://api.canva.com/rest/v1/users/me",
+              canvaHeaders(token),
+            );
+            checks.push({ name: "canva-user", ok: result.ok, status: result.status });
+            if (!result.ok) {
+              throw new ConnectorProbeError(
+                "service",
+                `Canva account probe failed with HTTP ${result.status}`,
+              );
             }
           }
 
