@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CLAWTEAM_REPO="https://github.com/The-Nexus-system/ClawTeam-OpenClaw.git"
 BASE_DIR="${NEXUS_KIT_HOME:-$HOME/.nexus-kit}"
 CLAWTEAM_DIR="$BASE_DIR/ClawTeam-OpenClaw"
@@ -43,6 +44,8 @@ fi
 
 clawteam config set transport file >/dev/null 2>&1 || true
 clawteam config health
+
+"$REPO_ROOT/scripts/nexus-kit-seed-workspace.sh"
 
 echo "Kit gateway integration ready."
 echo "OpenClaw remains the persistent gateway."
