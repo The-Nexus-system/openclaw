@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import getpass
+
+from nexus_kit_secret_store import get, set_secret
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Configure Metricool's official MCP without storing a Metricool password."
+    )
+    parser.add_argument("--user-id")
+    args = parser.parse_args()
+
+    print("Metricool MCP authorization")
+    print("This route stores the Metricool user token and user ID, not your Metricool password.")
+    print()
+
+    user_id = (args.user_id or "").strip()
+    if not user_id:
+        existing = get("METRICOOL_USER_ID")
+        if existing:
+            print("Metricool user ID: already stored.")
+            user_id = existing
+        else:
+            user_id = input("Metricool user ID: ").strip()
+            if not user_id:
+                raise SystemExit("Metricool user ID was empty; nothing changed.")
+            set_secret("METRICOOL_USER_ID", user_id)
+    else:
+        set_secret("METRICOOL_USER_ID", user_id)
+
+    if get("METRICOOL_USER_TOKEN"):
+        print("Metricool user token: already stored.")
+    else:
+        token = getpass.getpass("Metricool user token: ")
+        if not token:
+            raise SystemExit("Metricool user token was empty; nothing changed.")
+        confirm = getpass.getpass("Re-enter Metricool user token: ")
+        if token != confirm:
+            raise SystemExit("Metricool token values did not match; nothing changed.")
+        set_secret("METRICOOL_USER_TOKEN", token)
+        print("Metricool user token stored in the protected connector vault.")
+
+    print()
+    print("Metricool credential setup is ready for the live MCP health probe.")
+
+
+if __name__ == "__main__":
+    main()
