@@ -93,15 +93,15 @@ def set_secret(name: str, value: str) -> None:
 
 
 def import_file(name: str, source_path: str | Path, max_bytes: int = 1024 * 1024) -> None:
-    path = Path(source_path).expanduser().resolve(strict=False)
+    path = Path(source_path).expanduser()
     try:
         st = path.lstat()
     except FileNotFoundError as exc:
         raise ValueError("Source file does not exist.") from exc
 
-    if path.is_symlink():
+    if stat.S_ISLNK(st.st_mode):
         raise ValueError("Refusing to import a secret from a symbolic link.")
-    if not path.is_file():
+    if not stat.S_ISREG(st.st_mode):
         raise ValueError("Secret import source must be a regular file.")
     if st.st_size > max_bytes:
         raise ValueError("Secret import source is larger than the allowed size.")
