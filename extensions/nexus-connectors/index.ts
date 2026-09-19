@@ -50,12 +50,13 @@ async function providerGet(url: string, headers: Record<string, string>) {
     headers,
     redirect: "error",
   });
+
   const text = await response.text();
   let body: unknown = text;
   try {
     body = text ? JSON.parse(text) : null;
   } catch {
-    // Preserve non-JSON response text.
+    // Keep non-JSON text.
   }
 
   return {
@@ -64,7 +65,6 @@ async function providerGet(url: string, headers: Record<string, string>) {
     body,
   };
 }
-
 
 async function getGoogleAccessToken(): Promise<string> {
   const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -91,10 +91,17 @@ async function getGoogleAccessToken(): Promise<string> {
     redirect: "error",
   });
 
-  const body = (await response.json()) as { access_token?: string; error?: string; error_description?: string };
+  const body = (await response.json()) as {
+    access_token?: string;
+    error?: string;
+    error_description?: string;
+  };
+
   if (!response.ok || !body.access_token) {
     throw new Error(
-      body.error_description || body.error || `Google token refresh failed with HTTP ${response.status}`,
+      body.error_description ??
+        body.error ??
+        `Google token refresh failed with HTTP ${response.status}`,
     );
   }
 
@@ -130,15 +137,17 @@ function safeHeaderValue(value: string, field: string): string {
   }
   return value.trim();
 }
-\nexport default definePluginEntry({
+
+export default definePluginEntry({
   id: "nexus-connectors",
   name: "Nexus Connectors",
-  description: "Portable connector readiness and independent provider access for the Nexus Kit gateway.",
+  description:
+    "Portable connector readiness and independent provider access for the Nexus Kit gateway.",
   register(api) {
     api.registerTool({
       name: "nexus_connector_status",
       description:
-        "Inspect the Nexus Kit independent connector registry. Reports routes, target capabilities, declared state, and whether required credential environment variables are present. It never returns credential values and does not prove live provider access.",
+        "Inspect the independent Nexus connector registry. Reports routes, capabilities, declared state, and whether credential environment variables are present. It never returns credential values and does not prove live provider access.",
       parameters: Type.Object({
         connector: Type.Optional(
           Type.String({
@@ -221,10 +230,11 @@ function safeHeaderValue(value: string, field: string): string {
     api.registerTool({
       name: "nexus_github_get",
       description:
-        "Perform an independently authenticated read-only GET against the GitHub REST API using GITHUB_TOKEN on the OpenClaw host. Use provider-relative API paths only. This does not use a ChatGPT connector.",
+        "Perform an independently authenticated read-only GET against the GitHub REST API using GITHUB_TOKEN on the OpenClaw host. This does not use a ChatGPT connector.",
       parameters: Type.Object({
         path: Type.String({
-          description: "GitHub REST API path such as /repos/OWNER/REPO or /user/repos?per_page=20.",
+          description:
+            "GitHub REST API path such as /repos/OWNER/REPO or /user/repos?per_page=20.",
         }),
       }),
       async execute(_id, params) {
@@ -254,7 +264,9 @@ function safeHeaderValue(value: string, field: string): string {
           return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: message }) }] };
+          return {
+            content: [{ type: "text", text: JSON.stringify({ ok: false, error: message }) }],
+          };
         }
       },
     });
@@ -262,7 +274,7 @@ function safeHeaderValue(value: string, field: string): string {
     api.registerTool({
       name: "nexus_digitalocean_get",
       description:
-        "Perform an independently authenticated read-only GET against the DigitalOcean v2 API using DIGITALOCEAN_ACCESS_TOKEN on the OpenClaw host. Use provider-relative v2 paths only. This does not use a ChatGPT connector.",
+        "Perform an independently authenticated read-only GET against the DigitalOcean v2 API using DIGITALOCEAN_ACCESS_TOKEN on the OpenClaw host. This does not use a ChatGPT connector.",
       parameters: Type.Object({
         path: Type.String({
           description: "DigitalOcean v2 path such as /account, /droplets, or /regions.",
@@ -294,9 +306,125 @@ function safeHeaderValue(value: string, field: string): string {
           return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: message }) }] };
+          return {
+            content: [{ type: "text", text: JSON.stringify({ ok: false, error: message }) }],
+          };
         }
       },
     });
+
+    api.registerTool({
+      name: "nexus_google_get",
+      description:
+        "Perform an independently authenticated read-only GET against Gmail, Google Calendar, Google Drive, or Google People using OAuth credentials on the OpenClaw host. This does not use a ChatGPT connector.",
+      parameters: Type.Object({
+        service: Type.Union([
+          Type.Literal("gmail"),
+          Type.Literal("calendar"),
+          Type.Literal("drive"),
+          Type.Literal("people"),
+        ]),
+        path: Type.String({
+          description:
+            "Provider-relative API path such as Gmail /users/me/profile, Calendar /users/me/calendarList, Drive /files?pageSize=10, or People /people/me?personFields=names,emailAddresses.",
+        }),
+      }),
+      async execute(_id, params) {
+        try {
+          const token = await getGoogleAccessToken();
+          const apiPath = normalizeApiPath(params.path);
+          const result = await providerGet(`${googleServiceBase(params.service)}${apiPath}`, {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+            "User-Agent": "nexus-kit-openclaw",
+          });
+          return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return {
+            content: [{ type: "text", text: JSON.stringify({ ok: false, error: message }) }],
+          };
+        }
+      },
+    });
+
+    api.registerTool(
+      {
+        name: "nexus_gmail_send",
+        description:
+          "Send a plain-text email through the independently authenticated Gmail API on the OpenClaw host. This is a consequential write tool and does not use a ChatGPT connector.",
+        parameters: Type.Object({
+          to: Type.String(),
+          subject: Type.String(),
+          body: Type.String(),
+        }),
+        async execute(_id, params) {
+          try {
+            const to = safeHeaderValue(params.to, "to");
+            const subject = safeHeaderValue(params.subject, "subject");
+
+            if (!to) {
+              throw new Error("to is required");
+            }
+
+            const token = await getGoogleAccessToken();
+            const mime = [
+              `To: ${to}`,
+              `Subject: ${subject}`,
+              "MIME-Version: 1.0",
+              'Content-Type: text/plain; charset="UTF-8"',
+              "",
+              params.body,
+            ].join("\r\n");
+
+            const response = await fetch(
+              "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+              {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  "Content-Type": "application/json",
+                  Accept: "application/json",
+                  "User-Agent": "nexus-kit-openclaw",
+                },
+                body: JSON.stringify({ raw: base64UrlEncode(mime) }),
+                redirect: "error",
+              },
+            );
+
+            const text = await response.text();
+            let body: unknown = text;
+            try {
+              body = text ? JSON.parse(text) : null;
+            } catch {
+              // Keep non-JSON text.
+            }
+
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(
+                    {
+                      ok: response.ok,
+                      status: response.status,
+                      body,
+                    },
+                    null,
+                    2,
+                  ),
+                },
+              ],
+            };
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            return {
+              content: [{ type: "text", text: JSON.stringify({ ok: false, error: message }) }],
+            };
+          }
+        },
+      },
+      { optional: true },
+    );
   },
 });
