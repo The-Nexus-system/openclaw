@@ -1,9 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/plugin-entry";
 
-const { providerGet, getMicrosoftAccessToken } = vi.hoisted(() => ({
+const {
+  providerGet,
+  getMicrosoftAccessToken,
+  runExpoProjectRead,
+  facebookManagedPages,
+  instagramProfessionalIdentity,
+  threadsIdentity,
+  twilioAccountSid,
+  twilioGet,
+} = vi.hoisted(() => ({
   providerGet: vi.fn(),
   getMicrosoftAccessToken: vi.fn(),
+  runExpoProjectRead: vi.fn(),
+  facebookManagedPages: vi.fn(),
+  instagramProfessionalIdentity: vi.fn(),
+  threadsIdentity: vi.fn(),
+  twilioAccountSid: vi.fn(),
+  twilioGet: vi.fn(),
 }));
 
 vi.mock("./shared.js", () => ({
@@ -24,6 +39,15 @@ vi.mock("./shared.js", () => ({
   linearGraphql: vi.fn(),
   getZoomAccessToken: vi.fn(),
   zoomTargetUser: vi.fn(),
+  runExpoProjectRead,
+}));
+
+vi.mock("./social-shared.js", () => ({
+  facebookManagedPages,
+  instagramProfessionalIdentity,
+  threadsIdentity,
+  twilioAccountSid,
+  twilioGet,
 }));
 
 vi.mock("./creative-shared.js", () => ({
@@ -133,5 +157,68 @@ describe("nexus_connector_probe Microsoft Graph", () => {
     expect(payload.checks).toEqual([]);
     expect(payload.error).toBe("token refresh failed");
     expect(providerGet).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("nexus_connector_probe social providers", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    twilioAccountSid.mockReturnValue("ACaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+  });
+
+  it("marks Twilio read-verified only after the account endpoint succeeds", async () => {
+    twilioGet.mockResolvedValue(response());
+
+    const probe = registerAndGetProbe();
+    const result = await probe.execute("test", { connector: "twilio" });
+    const payload = JSON.parse(result.content[0]?.text ?? "{}");
+
+    expect(payload.readVerified).toBe(true);
+    expect(payload.checks).toEqual([
+      { name: "twilio-account", ok: true, status: 200 },
+    ]);
+    expect(twilioGet).toHaveBeenCalledWith(
+      "/Accounts/ACaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.json",
+    );
+  });
+
+  it("does not mark Facebook Pages verified when the Pages API denies access", async () => {
+    facebookManagedPages.mockResolvedValue(response(false, 403));
+
+    const probe = registerAndGetProbe();
+    const result = await probe.execute("test", { connector: "facebook-pages" });
+    const payload = JSON.parse(result.content[0]?.text ?? "{}");
+
+    expect(payload.readVerified).toBe(false);
+    expect(payload.checks).toEqual([
+      { name: "facebook-pages", ok: false, status: 403 },
+    ]);
+  });
+
+  it("marks Instagram verified after the professional-account route succeeds", async () => {
+    instagramProfessionalIdentity.mockResolvedValue(response());
+
+    const probe = registerAndGetProbe();
+    const result = await probe.execute("test", { connector: "instagram" });
+    const payload = JSON.parse(result.content[0]?.text ?? "{}");
+
+    expect(payload.readVerified).toBe(true);
+    expect(payload.checks).toEqual([
+      { name: "instagram-professional", ok: true, status: 200 },
+    ]);
+  });
+
+  it("marks Threads verified after the profile endpoint succeeds", async () => {
+    threadsIdentity.mockResolvedValue(response());
+
+    const probe = registerAndGetProbe();
+    const result = await probe.execute("test", { connector: "threads" });
+    const payload = JSON.parse(result.content[0]?.text ?? "{}");
+
+    expect(payload.readVerified).toBe(true);
+    expect(payload.checks).toEqual([
+      { name: "threads-profile", ok: true, status: 200 },
+    ]);
   });
 });
