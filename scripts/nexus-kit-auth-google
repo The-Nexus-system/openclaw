@@ -1,0 +1,135 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import base64
+import hashlib
+import json
+import os
+from pathlib import Path
+import secrets
+import tempfile
+import time
+import urllib.parse
+
+from nexus_kit_secret_store import get
+
+SCOPES = [
+    "openid",
+    "email",
+    "profile",
+    "https://www.googleapis.com/auth/gmail.modify",
+    "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/calendar",
+    "https://www.googleapis.com/auth/drive",
+    "https://www.googleapis.com/auth/contacts.readonly",
+]
+
+
+def b64url(value: bytes) -> str:
+    return base64.urlsafe_b64encode(value).decode("ascii").rstrip("=")
+
+
+def sha256_b64url(value: str) -> str:
+    return b64url(hashlib.sha256(value.encode("utf-8")).digest())
+
+
+def state_dir() -> Path:
+    raw = os.environ.get("NEXUS_KIT_OAUTH_STATE_DIR", "").strip()
+    return Path(raw).expanduser() if raw else Path.home() / ".openclaw" / "kit" / "oauth"
+
+
+def write_pending(value: dict[str, object]) -> None:
+    directory = state_dir()
+    directory.mkdir(parents=True, exist_ok=True)
+    if os.name != "nt":
+        os.chmod(directory, 0o700)
+
+    fd, temp_name = tempfile.mkstemp(prefix=".google-pending-", dir=directory)
+    temp = Path(temp_name)
+    target = directory / "google-pending.json"
+    try:
+        if os.name != "nt":
+            os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            json.dump(value, stream, indent=2)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temp, target)
+        if os.name != "nt":
+            os.chmod(target, 0o600)
+    finally:
+        if temp.exists():
+            temp.unlink(missing_ok=True)
+
+
+def main() -> None:
+    client_id = get("GOOGLE_CLIENT_ID")
+    client_secret = get("GOOGLE_CLIENT_SECRET")
+    redirect_uri = get("GOOGLE_REDIRECT_URI")
+
+    missing = [
+        name
+        for name, value in [
+            ("GOOGLE_CLIENT_ID", client_id),
+            ("GOOGLE_CLIENT_SECRET", client_secret),
+            ("GOOGLE_REDIRECT_URI", redirect_uri),
+        ]
+        if not value
+    ]
+    if missing:
+        raise SystemExit(
+            "Google Workspace authorization is not ready. Missing: " + ", ".join(missing)
+        )
+
+    assert redirect_uri is not None
+    parsed_redirect = urllib.parse.urlparse(redirect_uri)
+    if parsed_redirect.scheme != "https" or not parsed_redirect.netloc:
+        raise SystemExit("GOOGLE_REDIRECT_URI must be an absolute HTTPS URL.")
+    if parsed_redirect.path != "/nexus-kit/oauth/google/callback":
+        raise SystemExit(
+            "GOOGLE_REDIRECT_URI path must be /nexus-kit/oauth/google/callback "
+            "so it reaches the Nexus connector callback."
+        )
+
+    state = secrets.token_urlsafe(32)
+    verifier = secrets.token_urlsafe(48)
+    challenge = sha256_b64url(verifier)
+
+    write_pending(
+        {
+            "stateHash": sha256_b64url(state),
+            "codeVerifier": verifier,
+            "redirectUri": redirect_uri,
+            "createdAt": int(time.time() * 1000),
+        }
+    )
+
+    query = urllib.parse.urlencode(
+        {
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "scope": " ".join(SCOPES),
+            "access_type": "offline",
+            "prompt": "consent",
+            "include_granted_scopes": "true",
+            "state": state,
+            "code_challenge": challenge,
+            "code_challenge_method": "S256",
+        }
+    )
+
+    print("Google Workspace authorization is ready.")
+    print()
+    print("Open this link in Safari:")
+    print("https://accounts.google.com/o/oauth2/v2/auth?" + query)
+    print()
+    print("Choose the Google account and approve the requested access.")
+    print("Do not copy any authorization code or token back here.")
+    print("The OpenClaw callback will store the refresh token directly.")
+    print("This authorization request expires in 15 minutes.")
+
+
+if __name__ == "__main__":
+    main()
