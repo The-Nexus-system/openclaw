@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { getConnectorSecret } from "./connector-secrets.js";
 
 export type ConnectorRecord = {
   id: string;
@@ -104,9 +105,9 @@ export function sleep(ms: number): Promise<void> {
 }
 
 export async function getGoogleAccessToken(): Promise<string> {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+  const clientId = getConnectorSecret("GOOGLE_CLIENT_ID");
+  const clientSecret = getConnectorSecret("GOOGLE_CLIENT_SECRET");
+  const refreshToken = getConnectorSecret("GOOGLE_REFRESH_TOKEN");
 
   if (!clientId || !clientSecret || !refreshToken) {
     throw new Error(
@@ -186,12 +187,12 @@ export class ConnectorProbeError extends Error {
 }
 
 export async function getMicrosoftAccessToken(requiredScopes: string[] = []): Promise<string> {
-  const clientId = process.env.MICROSOFT_CLIENT_ID;
-  const refreshToken = process.env.MICROSOFT_REFRESH_TOKEN;
-  const tenant = process.env.MICROSOFT_TENANT_ID?.trim() || "common";
-  const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
+  const clientId = getConnectorSecret("MICROSOFT_CLIENT_ID");
+  const refreshToken = getConnectorSecret("MICROSOFT_REFRESH_TOKEN");
+  const tenant = getConnectorSecret("MICROSOFT_TENANT_ID")?.trim() || "common";
+  const clientSecret = getConnectorSecret("MICROSOFT_CLIENT_SECRET");
   const configuredScopes =
-    process.env.MICROSOFT_SCOPES?.trim() ||
+    getConnectorSecret("MICROSOFT_SCOPES")?.trim() ||
     "openid offline_access User.Read Mail.Read Calendars.Read";
   const scope = Array.from(
     new Set([...configuredScopes.split(/\s+/u).filter(Boolean), ...requiredScopes]),
@@ -252,12 +253,12 @@ export async function getMicrosoftAccessToken(requiredScopes: string[] = []): Pr
   return body.access_token;
 }
 export async function getDropboxAccessToken(): Promise<string> {
-  const direct = process.env.DROPBOX_ACCESS_TOKEN;
+  const direct = getConnectorSecret("DROPBOX_ACCESS_TOKEN");
   if (direct) return direct;
 
-  const appKey = process.env.DROPBOX_APP_KEY;
-  const appSecret = process.env.DROPBOX_APP_SECRET;
-  const refreshToken = process.env.DROPBOX_REFRESH_TOKEN;
+  const appKey = getConnectorSecret("DROPBOX_APP_KEY");
+  const appSecret = getConnectorSecret("DROPBOX_APP_SECRET");
+  const refreshToken = getConnectorSecret("DROPBOX_REFRESH_TOKEN");
 
   if (!appKey || !appSecret || !refreshToken) {
     throw new ConnectorProbeError(
@@ -312,7 +313,7 @@ export async function dropboxApi(path: string, payload: unknown) {
   );
 }
 export function notionHeaders(): Record<string, string> {
-  const token = process.env.NOTION_TOKEN || process.env.NOTION_ACCESS_TOKEN;
+  const token = getConnectorSecret("NOTION_TOKEN") || getConnectorSecret("NOTION_ACCESS_TOKEN");
   if (!token) {
     throw new ConnectorProbeError(
       "credentials",
@@ -322,14 +323,14 @@ export function notionHeaders(): Record<string, string> {
 
   return {
     Authorization: `Bearer ${token}`,
-    "Notion-Version": process.env.NOTION_VERSION?.trim() || "2026-03-11",
+    "Notion-Version": getConnectorSecret("NOTION_VERSION")?.trim() || "2026-03-11",
     Accept: "application/json",
     "User-Agent": "nexus-kit-openclaw",
   };
 }
 export async function linearGraphql(query: string, variables: Record<string, unknown> = {}) {
-  const apiKey = process.env.LINEAR_API_KEY;
-  const accessToken = process.env.LINEAR_ACCESS_TOKEN;
+  const apiKey = getConnectorSecret("LINEAR_API_KEY");
+  const accessToken = getConnectorSecret("LINEAR_ACCESS_TOKEN");
   if (!apiKey && !accessToken) {
     throw new ConnectorProbeError(
       "credentials",
@@ -370,11 +371,11 @@ export async function linearGraphql(query: string, variables: Record<string, unk
   };
 }
 export async function getZoomAccessToken(): Promise<{ token: string; mode: "direct" | "refresh" | "server-to-server" }> {
-  const direct = process.env.ZOOM_ACCESS_TOKEN;
+  const direct = getConnectorSecret("ZOOM_ACCESS_TOKEN");
   if (direct) return { token: direct, mode: "direct" };
 
-  const clientId = process.env.ZOOM_CLIENT_ID;
-  const clientSecret = process.env.ZOOM_CLIENT_SECRET;
+  const clientId = getConnectorSecret("ZOOM_CLIENT_ID");
+  const clientSecret = getConnectorSecret("ZOOM_CLIENT_SECRET");
   if (!clientId || !clientSecret) {
     throw new ConnectorProbeError(
       "credentials",
@@ -383,7 +384,7 @@ export async function getZoomAccessToken(): Promise<{ token: string; mode: "dire
   }
 
   const basic = Buffer.from(`${clientId}:${clientSecret}`, "utf8").toString("base64");
-  const refreshToken = process.env.ZOOM_REFRESH_TOKEN;
+  const refreshToken = getConnectorSecret("ZOOM_REFRESH_TOKEN");
 
   if (refreshToken) {
     const response = await fetch(
@@ -411,7 +412,7 @@ export async function getZoomAccessToken(): Promise<{ token: string; mode: "dire
     return { token: data.access_token, mode: "refresh" };
   }
 
-  const accountId = process.env.ZOOM_ACCOUNT_ID;
+  const accountId = getConnectorSecret("ZOOM_ACCOUNT_ID");
   if (!accountId) {
     throw new ConnectorProbeError(
       "credentials",
@@ -448,7 +449,7 @@ export function zoomTargetUser(mode: "direct" | "refresh" | "server-to-server", 
   const requested = explicit?.trim();
   if (requested) return requested;
   if (mode === "server-to-server") {
-    const configured = process.env.ZOOM_USER_ID?.trim();
+    const configured = getConnectorSecret("ZOOM_USER_ID")?.trim();
     if (!configured) {
       throw new ConnectorProbeError(
         "target-user",
