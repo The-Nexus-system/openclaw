@@ -186,7 +186,8 @@ async function getMicrosoftAccessToken(requiredScopes: string[] = []): Promise<s
   ).join(" ");
 
   if (!clientId || !refreshToken) {
-    throw new Error(
+    throw new ConnectorProbeError(
+      "credentials",
       "MICROSOFT_CLIENT_ID and MICROSOFT_REFRESH_TOKEN must be configured on the OpenClaw host.",
     );
   }
@@ -225,7 +226,8 @@ async function getMicrosoftAccessToken(requiredScopes: string[] = []): Promise<s
   }
 
   if (!response.ok || !body.access_token) {
-    throw new Error(
+    throw new ConnectorProbeError(
+      "token-refresh",
       body.error_description ??
         body.error ??
         `Microsoft token refresh failed with HTTP ${response.status}`,
@@ -490,18 +492,36 @@ export default definePluginEntry({
               headers,
             );
             checks.push({ name: "graph-identity", ok: identity.ok, status: identity.status });
+            if (!identity.ok) {
+              throw new ConnectorProbeError(
+                "identity",
+                `Microsoft Graph identity probe failed with HTTP ${identity.status}`,
+              );
+            }
 
             const mail = await providerGet(
               "https://graph.microsoft.com/v1.0/me/mailFolders/inbox?$select=id,displayName,totalItemCount,unreadItemCount",
               headers,
             );
             checks.push({ name: "outlook-mail", ok: mail.ok, status: mail.status });
+            if (!mail.ok) {
+              throw new ConnectorProbeError(
+                "mail",
+                `Microsoft Graph mail probe failed with HTTP ${mail.status}`,
+              );
+            }
 
             const calendar = await providerGet(
               "https://graph.microsoft.com/v1.0/me/calendars?$top=1&$select=id,name",
               headers,
             );
             checks.push({ name: "outlook-calendar", ok: calendar.ok, status: calendar.status });
+            if (!calendar.ok) {
+              throw new ConnectorProbeError(
+                "calendar",
+                `Microsoft Graph calendar probe failed with HTTP ${calendar.status}`,
+              );
+            }
           }
 
           const readVerified = checks.length > 0 && checks.every((check) => check.ok);
@@ -526,6 +546,7 @@ export default definePluginEntry({
           };
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
+          const phase = error instanceof ConnectorProbeError ? error.phase : "unknown";
           return {
             content: [
               {
@@ -534,6 +555,7 @@ export default definePluginEntry({
                   {
                     connector: params.connector,
                     readVerified: false,
+                    phase,
                     error: message,
                   },
                   null,
