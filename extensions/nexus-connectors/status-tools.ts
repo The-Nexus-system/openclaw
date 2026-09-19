@@ -12,8 +12,12 @@ import {
   linearGraphql,
   getZoomAccessToken,
   zoomTargetUser,
-  figmaHeaders,
 } from "./shared.js";
+import {
+  adobePhotoshopHeaders,
+  figmaHeaders,
+  getAdobePhotoshopAccessToken,
+} from "./creative-shared.js";
 
 export function registerStatusTools(api: OpenClawPluginApi) {
     api.registerTool({
@@ -131,6 +135,7 @@ export function registerStatusTools(api: OpenClawPluginApi) {
           Type.Literal("linear"),
           Type.Literal("zoom"),
           Type.Literal("figma"),
+          Type.Literal("adobe-photoshop"),
         ]),
       }),
       async execute(_id, params) {
@@ -222,6 +227,21 @@ export function registerStatusTools(api: OpenClawPluginApi) {
               throw new ConnectorProbeError(
                 "account",
                 `Figma account probe failed with HTTP ${result.status}`,
+              );
+            }
+          }
+
+          if (params.connector === "adobe-photoshop") {
+            const token = await getAdobePhotoshopAccessToken();
+            const result = await providerGet(
+              "https://image.adobe.io/pie/psdService/hello",
+              adobePhotoshopHeaders(token),
+            );
+            checks.push({ name: "adobe-photoshop-hello", ok: result.ok, status: result.status });
+            if (!result.ok) {
+              throw new ConnectorProbeError(
+                "hello",
+                `Adobe Photoshop hello probe failed with HTTP ${result.status}`,
               );
             }
           }
