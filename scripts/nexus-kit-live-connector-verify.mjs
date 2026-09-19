@@ -248,6 +248,28 @@ async function probeGoogle(kind) {
   };
 }
 
+async function probeFigma() {
+  const personalToken = process.env.FIGMA_TOKEN;
+  const oauthToken = process.env.FIGMA_ACCESS_TOKEN;
+  if (!personalToken && !oauthToken) {
+    return { connector: "figma", state: "unconfigured" };
+  }
+
+  const result = await getJson("https://api.figma.com/v1/me", {
+    ...(oauthToken
+      ? { Authorization: `Bearer ${oauthToken}` }
+      : { "X-Figma-Token": personalToken }),
+    Accept: "application/json",
+    "User-Agent": "nexus-kit-openclaw",
+  });
+
+  return {
+    connector: "figma",
+    state: result.ok ? "read-verified" : "failed",
+    checks: [{ endpoint: "/v1/me", ok: result.ok, status: result.status }],
+  };
+}
+
 async function probeZoom() {
   const auth = await zoomAccess();
   if (!auth) return { connector: "zoom", state: "unconfigured" };
@@ -423,6 +445,7 @@ const probes = {
   notion: probeNotion,
   linear: probeLinear,
   zoom: probeZoom,
+  figma: probeFigma,
 };
 
 const selected = target === "all" ? Object.keys(probes) : [target];
