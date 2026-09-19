@@ -35,6 +35,21 @@ for item in sorted(registry.get("connectors", []), key=lambda x: (x.get("priorit
     env_present = [name for name in required_env if os.environ.get(name)]
     env_missing = [name for name in required_env if not os.environ.get(name)]
 
+    alternatives = item.get("credentialAlternatives", [])
+    alternative_status = []
+    for group in alternatives:
+        present = [name for name in group if os.environ.get(name)]
+        missing = [name for name in group if not os.environ.get(name)]
+        alternative_status.append({
+            "group": group,
+            "present": present,
+            "missing": missing,
+            "satisfied": not missing,
+        })
+
+    optional_env = item.get("optionalCredentialEnv", [])
+    optional_present = [name for name in optional_env if os.environ.get(name)]
+
     cli_names = cli_by_id.get(cid, [])
     cli_present = [name for name in cli_names if shutil.which(name)]
     cli_missing = [name for name in cli_names if not shutil.which(name)]
@@ -42,12 +57,36 @@ for item in sorted(registry.get("connectors", []), key=lambda x: (x.get("priorit
     print(f"[{cid}] {item.get('provider', cid)}")
     print(f"  target state: {item.get('state', 'unknown')}")
     print(f"  routes: {', '.join(item.get('routes', [])) or 'none'}")
+
     if required_env:
-        print(f"  credential markers present: {len(env_present)}/{len(required_env)}")
+        print(f"  required credential markers present: {len(env_present)}/{len(required_env)}")
         if env_missing:
-            print(f"  missing markers: {', '.join(env_missing)}")
-    else:
-        print("  credential markers: none declared")
+            print(f"  missing required markers: {', '.join(env_missing)}")
+    elif not alternatives:
+        print("  required credential markers: none declared")
+
+    if alternatives:
+        satisfied = [entry for entry in alternative_status if entry["satisfied"]]
+        print(f"  alternate auth groups satisfied: {len(satisfied)}/{len(alternatives)}")
+        for index, entry in enumerate(alternative_status, start=1):
+            state = "ready" if entry["satisfied"] else "missing"
+            print(f"    option {index}: {state}")
+            if entry["missing"]:
+                print(f"      missing: {', '.join(entry['missing'])}")
+
+    if optional_env:
+        print(
+            "  optional credential markers present: "
+            + (", ".join(optional_present) if optional_present else "none")
+        )
+
+    read_scopes = item.get("requiredReadScopes", [])
+    write_scopes = item.get("requiredWriteScopes", [])
+    if read_scopes:
+        print(f"  required read scopes: {', '.join(read_scopes)}")
+    if write_scopes:
+        print(f"  required write scopes: {', '.join(write_scopes)}")
+
     if cli_names:
         print(f"  cli present: {', '.join(cli_present) if cli_present else 'none'}")
         if cli_missing:
