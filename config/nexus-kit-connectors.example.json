@@ -211,6 +211,14 @@
           "DROPBOX_APP_SECRET",
           "DROPBOX_REFRESH_TOKEN"
         ]
+      ],
+      "optionalCredentialEnv": [
+        "DROPBOX_REDIRECT_URI",
+        "DROPBOX_GRANTED_SCOPES"
+      ],
+      "notes": [
+        "Use browser OAuth with token_access_type=offline for persistent Kit access.",
+        "The refresh token is stored only in the protected connector vault."
       ]
     },
     {
@@ -304,10 +312,13 @@
         ]
       ],
       "optionalCredentialEnv": [
-        "ZOOM_USER_ID"
+        "ZOOM_USER_ID",
+        "ZOOM_REDIRECT_URI",
+        "ZOOM_GRANTED_SCOPES"
       ],
       "notes": [
         "ZOOM_USER_ID or an explicit userId is required for server-to-server user/meeting routes.",
+        "User OAuth refresh tokens rotate and currently expire after 90 days; Kit stores the newest token and must request reauthorization when it expires.",
         "The live probe verifies meeting access, not merely token issuance."
       ]
     },
@@ -435,11 +446,17 @@
         "profile:read"
       ],
       "secretState": [
-        "~/.openclaw/kit/secrets/canva.json"
+        "~/.openclaw/kit/connector-secrets.json"
       ],
       "notes": [
-        "Refresh-token rotation is persisted in private host state and never committed to Git.",
-        "The identity probe uses /rest/v1/users/me, which requires no specific scope."
+        "Canva browser authorization uses OAuth Authorization Code with PKCE.",
+        "Canva refresh tokens rotate; Kit stores the newest refresh token atomically in the protected connector vault.",
+        "The identity probe uses /rest/v1/users/me."
+      ],
+      "optionalCredentialEnv": [
+        "CANVA_REDIRECT_URI",
+        "CANVA_SCOPES",
+        "CANVA_GRANTED_SCOPES"
       ]
     },
     {
