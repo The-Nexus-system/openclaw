@@ -326,6 +326,45 @@ function notionHeaders(): Record<string, string> {
     "User-Agent": "nexus-kit-openclaw",
   };
 }
+async function linearGraphql(query: string, variables: Record<string, unknown> = {}) {
+  const apiKey = process.env.LINEAR_API_KEY;
+  const accessToken = process.env.LINEAR_ACCESS_TOKEN;
+  if (!apiKey && !accessToken) {
+    throw new Error("LINEAR_API_KEY or LINEAR_ACCESS_TOKEN must be configured on the OpenClaw host.");
+  }
+
+  const response = await fetch("https://api.linear.app/graphql", {
+    method: "POST",
+    headers: {
+      Authorization: accessToken ? `Bearer ${accessToken}` : apiKey!,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "User-Agent": "nexus-kit-openclaw",
+    },
+    body: JSON.stringify({ query, variables }),
+    redirect: "error",
+  });
+
+  const text = await response.text();
+  let body: { data?: unknown; errors?: unknown[] } | unknown = text;
+  try {
+    body = text ? JSON.parse(text) : {};
+  } catch {
+    // Keep text for diagnostics.
+  }
+
+  const graphqlErrors =
+    body && typeof body === "object" && "errors" in body && Array.isArray((body as { errors?: unknown }).errors)
+      ? (body as { errors: unknown[] }).errors
+      : [];
+
+  return {
+    ok: response.ok && graphqlErrors.length === 0,
+    status: response.status,
+    body,
+    graphqlErrors,
+  };
+}
 
 export default definePluginEntry({
   id: "nexus-connectors",
@@ -445,6 +484,7 @@ export default definePluginEntry({
           Type.Literal("microsoft-graph"),
           Type.Literal("dropbox"),
           Type.Literal("notion"),
+          Type.Literal("linear"),
         ]),
       }),
       async execute(_id, params) {
@@ -524,6 +564,13 @@ export default definePluginEntry({
               );
               checks.push({ name: "people-me", ok: result.ok, status: result.status });
             }
+          }
+
+          if (params.connector === "linear") {
+            const result = await linearGraphql(
+              "query NexusKitViewer { viewer { id name email } }",
+            );
+            checks.push({ name: "linear-viewer", ok: result.ok, status: result.status });
           }
 
           if (params.connector === "notion") {
@@ -721,6 +768,76 @@ export default definePluginEntry({
       },
     });
 
+
+    api.registerTool({
+      name: "nexus_linear_read",
+      description:
+        "Read Linear through an independently authenticated OpenClaw route. Supports viewer identity, issues, teams, and projects without using a ChatGPT connector.",
+      parameters: Type.Object({
+        operation: Type.Union([
+          Type.Literal("me"),
+          Type.Literal("issues"),
+          Type.Literal("teams"),
+          Type.Literal("projects"),
+        ]),
+        first: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
+      }),
+      async execute(_id, params) {
+        try {
+          const first = params.first ?? 20;
+          let query: string;
+          let variables: Record<string, unknown> = {};
+
+          if (params.operation === "me") {
+            query = "query NexusKitViewer { viewer { id name email displayName } }";
+          } else if (params.operation === "issues") {
+            query = `
+              query NexusKitIssues($first: Int!) {
+                issues(first: $first) {
+                  nodes {
+                    id
+                    identifier
+                    title
+                    url
+                    updatedAt
+                    state { id name type }
+                    team { id name key }
+                    assignee { id name email }
+                  }
+                }
+              }
+            `;
+            variables = { first };
+          } else if (params.operation === "teams") {
+            query = `
+              query NexusKitTeams($first: Int!) {
+                teams(first: $first) {
+                  nodes { id name key description }
+                }
+              }
+            `;
+            variables = { first };
+          } else {
+            query = `
+              query NexusKitProjects($first: Int!) {
+                projects(first: $first) {
+                  nodes { id name slugId url state progress updatedAt }
+                }
+              }
+            `;
+            variables = { first };
+          }
+
+          const result = await linearGraphql(query, variables);
+          return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return {
+            content: [{ type: "text", text: JSON.stringify({ ok: false, error: message }) }],
+          };
+        }
+      },
+    });
 
     api.registerTool({
       name: "nexus_notion_read",
