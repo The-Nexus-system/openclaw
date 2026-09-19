@@ -143,7 +143,9 @@
       ],
       "credentialEnv": [
         "MICROSOFT_CLIENT_ID",
-        "MICROSOFT_REFRESH_TOKEN"
+        "MICROSOFT_TENANT_ID",
+        "MICROSOFT_REFRESH_TOKEN",
+        "MICROSOFT_SCOPES"
       ],
       "targetCapabilities": [
         "mail.read",
@@ -154,9 +156,18 @@
       ],
       "state": "planned",
       "optionalCredentialEnv": [
-        "MICROSOFT_CLIENT_SECRET",
-        "MICROSOFT_TENANT_ID",
-        "MICROSOFT_SCOPES"
+        "MICROSOFT_CLIENT_SECRET"
+      ],
+      "requiredReadScopes": [
+        "openid",
+        "offline_access",
+        "User.Read",
+        "Mail.Read",
+        "Calendars.Read"
+      ],
+      "requiredWriteScopes": [
+        "Mail.Send",
+        "Calendars.ReadWrite"
       ]
     },
     {
