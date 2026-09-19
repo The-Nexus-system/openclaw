@@ -1,5 +1,5 @@
 import { ConnectorProbeError } from "./shared.js";
-import { getConnectorSecret, setConnectorSecret } from "./connector-secrets.js";
+import { getConnectorSecret, getRotatingConnectorSecret, setConnectorSecret } from "./connector-secrets.js";
 
 export function figmaHeaders(): Record<string, string> {
   const personalToken = getConnectorSecret("FIGMA_TOKEN");
@@ -89,7 +89,7 @@ export async function getCanvaAccessToken(): Promise<string> {
 
   const clientId = getConnectorSecret("CANVA_CLIENT_ID");
   const clientSecret = getConnectorSecret("CANVA_CLIENT_SECRET");
-  const refreshToken = getConnectorSecret("CANVA_REFRESH_TOKEN");
+  const refreshToken = getRotatingConnectorSecret("CANVA_REFRESH_TOKEN");
 
   if (!clientId || !clientSecret || !refreshToken) {
     throw new ConnectorProbeError(
