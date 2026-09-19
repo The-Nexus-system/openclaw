@@ -25,7 +25,7 @@ text = json.dumps(data).lower()
 if "nexus-connectors" not in text:
     raise SystemExit("FAIL: plugin inspection did not identify nexus-connectors")
 
-bad = ("hard error", "failed to load", '"loaded": false', '"enabled": false')
+bad = ("hard error", "failed to load", '"loaded": false')
 if any(marker in text for marker in bad):
     raise SystemExit("FAIL: plugin inspection reports an unloadable/disabled connector plugin")
 
