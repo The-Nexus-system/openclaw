@@ -398,6 +398,7 @@ export default definePluginEntry({
           Type.Literal("google-drive"),
           Type.Literal("google-contacts"),
           Type.Literal("microsoft-graph"),
+          Type.Literal("dropbox"),
         ]),
       }),
       async execute(_id, params) {
@@ -477,6 +478,11 @@ export default definePluginEntry({
               );
               checks.push({ name: "people-me", ok: result.ok, status: result.status });
             }
+          }
+
+          if (params.connector === "dropbox") {
+            const result = await dropboxApi("users/get_current_account", {});
+            checks.push({ name: "dropbox-account", ok: result.ok, status: result.status });
           }
 
           if (params.connector === "microsoft-graph") {
