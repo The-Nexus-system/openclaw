@@ -47,6 +47,37 @@ async function googleToken() {
   return data.access_token;
 }
 
+async function dropboxToken() {
+  if (process.env.DROPBOX_ACCESS_TOKEN) return process.env.DROPBOX_ACCESS_TOKEN;
+
+  const appKey = process.env.DROPBOX_APP_KEY;
+  const appSecret = process.env.DROPBOX_APP_SECRET;
+  const refreshToken = process.env.DROPBOX_REFRESH_TOKEN;
+  if (!appKey || !appSecret || !refreshToken) return null;
+
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+    client_id: appKey,
+    client_secret: appSecret,
+  });
+
+  const response = await fetch("https://api.dropboxapi.com/oauth2/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+    redirect: "error",
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.access_token) {
+    throw new Error(
+      data.error_description || data.error || `Dropbox OAuth HTTP ${response.status}`,
+    );
+  }
+  return data.access_token;
+}
+
 async function microsoftToken() {
   const clientId = process.env.MICROSOFT_CLIENT_ID;
   const refreshToken = process.env.MICROSOFT_REFRESH_TOKEN;
@@ -167,6 +198,35 @@ async function probeGoogle(kind) {
   };
 }
 
+async function probeDropbox() {
+  const token = await dropboxToken();
+  if (!token) return { connector: "dropbox", state: "unconfigured" };
+
+  const response = await fetch("https://api.dropboxapi.com/2/users/get_current_account", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "User-Agent": "nexus-kit-openclaw",
+    },
+    body: "{}",
+    redirect: "error",
+  });
+
+  return {
+    connector: "dropbox",
+    state: response.ok ? "read-verified" : "failed",
+    checks: [
+      {
+        endpoint: "/2/users/get_current_account",
+        ok: response.ok,
+        status: response.status,
+      },
+    ],
+  };
+}
+
 async function probeMicrosoft() {
   const token = await microsoftToken();
   if (!token) return { connector: "microsoft-graph", state: "unconfigured" };
@@ -213,6 +273,7 @@ const probes = {
   "google-drive": () => probeGoogle("google-drive"),
   "google-contacts": () => probeGoogle("google-contacts"),
   "microsoft-graph": probeMicrosoft,
+  dropbox: probeDropbox,
 };
 
 const selected = target === "all" ? Object.keys(probes) : [target];
