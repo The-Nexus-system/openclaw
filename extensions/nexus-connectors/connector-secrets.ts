@@ -61,6 +61,15 @@ export function getConnectorSecret(name: string): string | undefined {
   return readFileSecrets()[name];
 }
 
+export function getRotatingConnectorSecret(name: string): string | undefined {
+  const fileValue = readFileSecrets()[name];
+  if (fileValue && fileValue.length > 0) {
+    return fileValue;
+  }
+  const envValue = process.env[name];
+  return envValue && envValue.length > 0 ? envValue : undefined;
+}
+
 export function hasConnectorSecret(name: string): boolean {
   return Boolean(getConnectorSecret(name));
 }
