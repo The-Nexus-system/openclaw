@@ -262,7 +262,8 @@ async function getDropboxAccessToken(): Promise<string> {
   const refreshToken = process.env.DROPBOX_REFRESH_TOKEN;
 
   if (!appKey || !appSecret || !refreshToken) {
-    throw new Error(
+    throw new ConnectorProbeError(
+      "credentials",
       "Configure DROPBOX_ACCESS_TOKEN or DROPBOX_APP_KEY, DROPBOX_APP_SECRET, and DROPBOX_REFRESH_TOKEN on the OpenClaw host.",
     );
   }
@@ -288,7 +289,8 @@ async function getDropboxAccessToken(): Promise<string> {
   };
 
   if (!response.ok || !data.access_token) {
-    throw new Error(
+    throw new ConnectorProbeError(
+      "token-refresh",
       data.error_description ??
         data.error ??
         `Dropbox OAuth HTTP ${response.status}`,
@@ -535,6 +537,12 @@ export default definePluginEntry({
           if (params.connector === "dropbox") {
             const result = await dropboxApi("users/get_current_account", {});
             checks.push({ name: "dropbox-account", ok: result.ok, status: result.status });
+            if (!result.ok) {
+              throw new ConnectorProbeError(
+                "account",
+                `Dropbox account probe failed with HTTP ${result.status}`,
+              );
+            }
           }
 
           if (params.connector === "microsoft-graph") {
