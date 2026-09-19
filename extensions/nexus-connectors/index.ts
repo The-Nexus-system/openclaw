@@ -234,6 +234,64 @@ async function getMicrosoftAccessToken(requiredScopes: string[] = []): Promise<s
 
   return body.access_token;
 }
+async function getDropboxAccessToken(): Promise<string> {
+  const direct = process.env.DROPBOX_ACCESS_TOKEN;
+  if (direct) return direct;
+
+  const appKey = process.env.DROPBOX_APP_KEY;
+  const appSecret = process.env.DROPBOX_APP_SECRET;
+  const refreshToken = process.env.DROPBOX_REFRESH_TOKEN;
+
+  if (!appKey || !appSecret || !refreshToken) {
+    throw new Error(
+      "Configure DROPBOX_ACCESS_TOKEN or DROPBOX_APP_KEY, DROPBOX_APP_SECRET, and DROPBOX_REFRESH_TOKEN on the OpenClaw host.",
+    );
+  }
+
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+    client_id: appKey,
+    client_secret: appSecret,
+  });
+
+  const response = await fetch("https://api.dropboxapi.com/oauth2/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+    redirect: "error",
+  });
+
+  const data = (await response.json().catch(() => ({}))) as {
+    access_token?: string;
+    error?: string;
+    error_description?: string;
+  };
+
+  if (!response.ok || !data.access_token) {
+    throw new Error(
+      data.error_description ??
+        data.error ??
+        `Dropbox OAuth HTTP ${response.status}`,
+    );
+  }
+
+  return data.access_token;
+}
+
+async function dropboxApi(path: string, payload: unknown) {
+  const token = await getDropboxAccessToken();
+  return providerJsonRequest(
+    `https://api.dropboxapi.com/2/${path}`,
+    "POST",
+    {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+      "User-Agent": "nexus-kit-openclaw",
+    },
+    payload,
+  );
+}
 
 export default definePluginEntry({
   id: "nexus-connectors",
@@ -574,6 +632,69 @@ export default definePluginEntry({
       },
     });
 
+
+    api.registerTool({
+      name: "nexus_dropbox_read",
+      description:
+        "Read Dropbox through an independently authenticated OpenClaw route. Operations are limited to account identity, folder listing, search, and metadata; this tool does not mutate Dropbox.",
+      parameters: Type.Object({
+        operation: Type.Union([
+          Type.Literal("account"),
+          Type.Literal("list_folder"),
+          Type.Literal("search"),
+          Type.Literal("metadata"),
+        ]),
+        path: Type.Optional(Type.String()),
+        query: Type.Optional(Type.String()),
+        limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
+      }),
+      async execute(_id, params) {
+        try {
+          let result;
+
+          if (params.operation === "account") {
+            result = await dropboxApi("users/get_current_account", {});
+          } else if (params.operation === "list_folder") {
+            result = await dropboxApi("files/list_folder", {
+              path: params.path ?? "",
+              recursive: false,
+              include_deleted: false,
+              include_non_downloadable_files: true,
+              limit: params.limit ?? 20,
+            });
+          } else if (params.operation === "search") {
+            const query = params.query?.trim();
+            if (!query) throw new Error("query is required for Dropbox search");
+            result = await dropboxApi("files/search_v2", {
+              query,
+              options: {
+                path: params.path ?? "",
+                max_results: params.limit ?? 20,
+                file_status: "active",
+              },
+            });
+          } else {
+            const targetPath = params.path?.trim();
+            if (!targetPath) throw new Error("path is required for Dropbox metadata");
+            result = await dropboxApi("files/get_metadata", {
+              path: targetPath,
+              include_media_info: false,
+              include_deleted: false,
+              include_has_explicit_shared_members: true,
+            });
+          }
+
+          return {
+            content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return {
+            content: [{ type: "text", text: JSON.stringify({ ok: false, error: message }) }],
+          };
+        }
+      },
+    });
 
     api.registerTool({
       name: "nexus_microsoft_graph_get",
