@@ -266,15 +266,34 @@
         "official-api",
         "openclaw-plugin"
       ],
-      "credentialEnv": [
-        "ZOOM_CLIENT_ID",
-        "ZOOM_CLIENT_SECRET"
-      ],
+      "credentialEnv": [],
       "targetCapabilities": [
         "meetings.read",
         "recordings.read"
       ],
-      "state": "planned"
+      "state": "planned",
+      "credentialAlternatives": [
+        [
+          "ZOOM_ACCESS_TOKEN"
+        ],
+        [
+          "ZOOM_CLIENT_ID",
+          "ZOOM_CLIENT_SECRET",
+          "ZOOM_REFRESH_TOKEN"
+        ],
+        [
+          "ZOOM_ACCOUNT_ID",
+          "ZOOM_CLIENT_ID",
+          "ZOOM_CLIENT_SECRET"
+        ]
+      ],
+      "optionalCredentialEnv": [
+        "ZOOM_USER_ID"
+      ],
+      "notes": [
+        "ZOOM_USER_ID or an explicit userId is required for server-to-server user/meeting routes.",
+        "The live probe verifies meeting access, not merely token issuance."
+      ]
     },
     {
       "id": "spotify",
