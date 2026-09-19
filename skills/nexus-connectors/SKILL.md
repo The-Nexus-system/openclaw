@@ -27,6 +27,8 @@ Run:
 
 before assuming a connector is usable on a newly deployed or restored host.
 
+After credentials are configured, call `nexus_connector_probe` for the provider. Do not promote the connector to read-verified unless that live probe returns `readVerified: true`.
+
 ## Route selection
 
 Prefer, in order:
