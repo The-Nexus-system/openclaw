@@ -1,11 +1,9 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import { ConnectorProbeError } from "./shared.js";
+import { getConnectorSecret, setConnectorSecret } from "./connector-secrets.js";
 
 export function figmaHeaders(): Record<string, string> {
-  const personalToken = process.env.FIGMA_TOKEN;
-  const oauthToken = process.env.FIGMA_ACCESS_TOKEN;
+  const personalToken = getConnectorSecret("FIGMA_TOKEN");
+  const oauthToken = getConnectorSecret("FIGMA_ACCESS_TOKEN");
 
   if (!personalToken && !oauthToken) {
     throw new ConnectorProbeError(
@@ -24,11 +22,11 @@ export function figmaHeaders(): Record<string, string> {
 }
 
 export async function getAdobePhotoshopAccessToken(): Promise<string> {
-  const direct = process.env.ADOBE_PHOTOSHOP_ACCESS_TOKEN;
+  const direct = getConnectorSecret("ADOBE_PHOTOSHOP_ACCESS_TOKEN");
   if (direct) return direct;
 
-  const clientId = process.env.ADOBE_PHOTOSHOP_CLIENT_ID;
-  const clientSecret = process.env.ADOBE_PHOTOSHOP_CLIENT_SECRET;
+  const clientId = getConnectorSecret("ADOBE_PHOTOSHOP_CLIENT_ID");
+  const clientSecret = getConnectorSecret("ADOBE_PHOTOSHOP_CLIENT_SECRET");
   if (!clientId || !clientSecret) {
     throw new ConnectorProbeError(
       "credentials",
@@ -41,7 +39,7 @@ export async function getAdobePhotoshopAccessToken(): Promise<string> {
     client_id: clientId,
     client_secret: clientSecret,
     scope:
-      process.env.ADOBE_PHOTOSHOP_SCOPES?.trim() ||
+      getConnectorSecret("ADOBE_PHOTOSHOP_SCOPES")?.trim() ||
       "openid,AdobeID,read_organizations",
   });
 
@@ -69,7 +67,7 @@ export async function getAdobePhotoshopAccessToken(): Promise<string> {
 }
 
 export function adobePhotoshopHeaders(token: string): Record<string, string> {
-  const clientId = process.env.ADOBE_PHOTOSHOP_CLIENT_ID;
+  const clientId = getConnectorSecret("ADOBE_PHOTOSHOP_CLIENT_ID");
   if (!clientId) {
     throw new ConnectorProbeError(
       "credentials",
@@ -85,45 +83,13 @@ export function adobePhotoshopHeaders(token: string): Record<string, string> {
   };
 }
 
-function creativeSecretStateDir(): string {
-  return (
-    process.env.NEXUS_KIT_SECRET_STATE_DIR?.trim() ||
-    path.join(os.homedir(), ".openclaw", "kit", "secrets")
-  );
-}
-
-function readCreativeSecretState(name: string): Record<string, unknown> {
-  const file = path.join(creativeSecretStateDir(), `${name}.json`);
-  try {
-    return JSON.parse(fs.readFileSync(file, "utf8")) as Record<string, unknown>;
-  } catch {
-    return {};
-  }
-}
-
-function writeCreativeSecretState(name: string, value: Record<string, unknown>): void {
-  const dir = creativeSecretStateDir();
-  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-  const file = path.join(dir, `${name}.json`);
-  const temp = `${file}.tmp`;
-  fs.writeFileSync(temp, JSON.stringify(value, null, 2) + "\n", {
-    encoding: "utf8",
-    mode: 0o600,
-  });
-  fs.chmodSync(temp, 0o600);
-  fs.renameSync(temp, file);
-}
-
 export async function getCanvaAccessToken(): Promise<string> {
-  const direct = process.env.CANVA_ACCESS_TOKEN;
+  const direct = getConnectorSecret("CANVA_ACCESS_TOKEN");
   if (direct) return direct;
 
-  const clientId = process.env.CANVA_CLIENT_ID;
-  const clientSecret = process.env.CANVA_CLIENT_SECRET;
-  const stored = readCreativeSecretState("canva");
-  const refreshToken =
-    (typeof stored.refresh_token === "string" ? stored.refresh_token : undefined) ||
-    process.env.CANVA_REFRESH_TOKEN;
+  const clientId = getConnectorSecret("CANVA_CLIENT_ID");
+  const clientSecret = getConnectorSecret("CANVA_CLIENT_SECRET");
+  const refreshToken = getConnectorSecret("CANVA_REFRESH_TOKEN");
 
   if (!clientId || !clientSecret || !refreshToken) {
     throw new ConnectorProbeError(
@@ -165,11 +131,7 @@ export async function getCanvaAccessToken(): Promise<string> {
   }
 
   if (data.refresh_token) {
-    writeCreativeSecretState("canva", {
-      refresh_token: data.refresh_token,
-      updated_at: new Date().toISOString(),
-      scope: data.scope ?? null,
-    });
+    setConnectorSecret("CANVA_REFRESH_TOKEN", data.refresh_token);
   }
 
   return data.access_token;
