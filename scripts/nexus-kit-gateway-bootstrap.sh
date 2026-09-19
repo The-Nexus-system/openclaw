@@ -57,7 +57,10 @@ clawteam config health
 
 "$REPO_ROOT/scripts/nexus-kit-seed-workspace.sh"
 
-NEXUS_CONNECTOR_REGISTRY="$CONNECTOR_STATE_DIR/connectors.json"   "$REPO_ROOT/scripts/nexus-kit-connector-audit.sh" || true
+NEXUS_CONNECTOR_REGISTRY="$CONNECTOR_STATE_DIR/connectors.json" \
+  "$REPO_ROOT/scripts/nexus-kit-connector-audit.sh" || true
+
+node "$REPO_ROOT/scripts/nexus-kit-live-connector-verify.mjs" all || true
 
 if command -v openclaw >/dev/null 2>&1; then
   openclaw plugins inspect nexus-connectors --json >/dev/null 2>&1 || true
