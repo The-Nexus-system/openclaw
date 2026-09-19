@@ -263,3 +263,128 @@ describe("nexus-connectors Dropbox health probe", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+
+describe("nexus-connectors provider health probes", () => {
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    for (const key of [
+      "FIGMA_TOKEN",
+      "FIGMA_ACCESS_TOKEN",
+      "ADOBE_PHOTOSHOP_ACCESS_TOKEN",
+      "ADOBE_PHOTOSHOP_CLIENT_ID",
+      "ADOBE_PHOTOSHOP_CLIENT_SECRET",
+      "NOTION_TOKEN",
+      "NOTION_ACCESS_TOKEN",
+      "LINEAR_API_KEY",
+      "LINEAR_ACCESS_TOKEN",
+      "ZOOM_ACCESS_TOKEN",
+      "ZOOM_CLIENT_ID",
+      "ZOOM_CLIENT_SECRET",
+      "ZOOM_REFRESH_TOKEN",
+      "ZOOM_ACCOUNT_ID",
+      "ZOOM_USER_ID",
+    ]) {
+      delete process.env[key];
+    }
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  const cases = [
+    {
+      connector: "figma",
+      expectedUrl: "https://api.figma.com/v1/me",
+      check: "figma-me",
+      setup: () => {
+        process.env.FIGMA_TOKEN = "figma-test";
+      },
+    },
+    {
+      connector: "adobe-photoshop",
+      expectedUrl: "https://image.adobe.io/pie/psdService/hello",
+      check: "adobe-photoshop-hello",
+      setup: () => {
+        process.env.ADOBE_PHOTOSHOP_ACCESS_TOKEN = "adobe-test";
+        process.env.ADOBE_PHOTOSHOP_CLIENT_ID = "adobe-client";
+      },
+    },
+    {
+      connector: "notion",
+      expectedUrl: "https://api.notion.com/v1/users/me",
+      check: "notion-user",
+      setup: () => {
+        process.env.NOTION_TOKEN = "notion-test";
+      },
+    },
+    {
+      connector: "linear",
+      expectedUrl: "https://api.linear.app/graphql",
+      check: "linear-viewer",
+      setup: () => {
+        process.env.LINEAR_API_KEY = "linear-test";
+      },
+    },
+    {
+      connector: "zoom",
+      expectedUrl:
+        "https://api.zoom.us/v2/users/me/meetings?type=previous_meetings&page_size=1",
+      check: "zoom-meetings",
+      setup: () => {
+        process.env.ZOOM_ACCESS_TOKEN = "zoom-test";
+      },
+    },
+  ] as const;
+
+  it.each(cases)(
+    "marks $connector read-verified only after reaching its provider endpoint",
+    async ({ connector, expectedUrl, check, setup }) => {
+      setup();
+      const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+        expect(String(input)).toBe(expectedUrl);
+        return jsonResponse({ data: { viewer: { id: "test" } } });
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const tool = getTool("nexus_connector_probe");
+      const result = await tool.execute("test", { connector });
+      const payload = JSON.parse(result.content[0].text);
+
+      expect(payload.readVerified).toBe(true);
+      expect(payload.checks).toEqual([{ name: check, ok: true, status: 200 }]);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("keeps Figma unverified when the provider rejects the token", async () => {
+    process.env.FIGMA_TOKEN = "figma-test";
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ message: "unauthorized" }, 401)));
+
+    const tool = getTool("nexus_connector_probe");
+    const result = await tool.execute("test", { connector: "figma" });
+    const payload = JSON.parse(result.content[0].text);
+
+    expect(payload.readVerified).toBe(false);
+    expect(payload.phase).toBe("account");
+    expect(payload.checks).toEqual([{ name: "figma-me", ok: false, status: 401 }]);
+  });
+
+  it("reports Adobe credential failure before making a provider request", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const tool = getTool("nexus_connector_probe");
+    const result = await tool.execute("test", { connector: "adobe-photoshop" });
+    const payload = JSON.parse(result.content[0].text);
+
+    expect(payload.readVerified).toBe(false);
+    expect(payload.phase).toBe("credentials");
+    expect(payload.checks).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
