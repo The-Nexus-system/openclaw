@@ -11,6 +11,12 @@ MCP_REMOTE_VERSION = "0.1.38"
 METRICOOL_MCP_URL = "https://ai.metricool.com/mcp"
 
 
+def oauth_cache_exists(state_dir: Path) -> bool:
+    if not state_dir.exists():
+        return False
+    return any(state_dir.rglob("*_tokens.json"))
+
+
 def main() -> None:
     npx = shutil.which("npx")
     if not npx:
@@ -41,10 +47,16 @@ def main() -> None:
             os.chmod(header_file, 0o600)
         args.extend(["--header-file", str(header_file), "--silent"])
     else:
-        # Headless-friendly OAuth. This succeeds only if Metricool advertises
-        # RFC 8628 device authorization. nexus-kit-auth metricool performs the
-        # first interactive authorization and stores mcp-remote's token cache.
-        args.append("--device-code")
+        if not oauth_cache_exists(state_dir):
+            raise SystemExit(
+                "Metricool OAuth is not authorized on this host. "
+                "Run 'nexus-kit-auth metricool' first."
+            )
+        # Never fall back to an invisible local-browser flow on the headless
+        # persistent host. Existing refresh tokens remain non-interactive; if
+        # reauthorization becomes necessary, mcp-remote fails through the
+        # device-code path and Kit can ask for a foreground auth run.
+        args.extend(["--device-code", "--silent"])
 
     os.execve(npx, args, env)
 
