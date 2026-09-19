@@ -90,3 +90,28 @@ def set_secret(name: str, value: str) -> None:
     values = load()
     values[name] = value
     save(values)
+
+
+def import_file(name: str, source_path: str | Path, max_bytes: int = 1024 * 1024) -> None:
+    path = Path(source_path).expanduser().resolve(strict=False)
+    try:
+        st = path.lstat()
+    except FileNotFoundError as exc:
+        raise ValueError("Source file does not exist.") from exc
+
+    if path.is_symlink():
+        raise ValueError("Refusing to import a secret from a symbolic link.")
+    if not path.is_file():
+        raise ValueError("Secret import source must be a regular file.")
+    if st.st_size > max_bytes:
+        raise ValueError("Secret import source is larger than the allowed size.")
+
+    try:
+        value = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("Secret import source must be UTF-8 text.") from exc
+
+    if not value.strip():
+        raise ValueError("Secret import source is empty; nothing was changed.")
+
+    set_secret(name, value)
