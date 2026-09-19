@@ -12,6 +12,9 @@ const {
   twilioGet,
   openAIGet,
   metaDeveloperAppRead,
+  appStoreConnectGet,
+  googlePlayGet,
+  googlePlayPackageName,
 } = vi.hoisted(() => ({
   providerGet: vi.fn(),
   getMicrosoftAccessToken: vi.fn(),
@@ -23,6 +26,9 @@ const {
   twilioGet: vi.fn(),
   openAIGet: vi.fn(),
   metaDeveloperAppRead: vi.fn(),
+  appStoreConnectGet: vi.fn(),
+  googlePlayGet: vi.fn(),
+  googlePlayPackageName: vi.fn(),
 }));
 
 vi.mock("./shared.js", () => ({
@@ -49,6 +55,9 @@ vi.mock("./shared.js", () => ({
 vi.mock("./developer-shared.js", () => ({
   openAIGet,
   metaDeveloperAppRead,
+  appStoreConnectGet,
+  googlePlayGet,
+  googlePlayPackageName,
 }));
 
 vi.mock("./social-shared.js", () => ({
@@ -276,5 +285,51 @@ describe("nexus_connector_probe developer platforms", () => {
     expect(payload.checks).toEqual([
       { name: "meta-developer-app", ok: true, status: 200 },
     ]);
+  });
+
+
+  it("marks App Store Connect verified only after the apps endpoint succeeds", async () => {
+    appStoreConnectGet.mockResolvedValue(response());
+
+    const probe = registerAndGetProbe();
+    const result = await probe.execute("test", { connector: "app-store-connect" });
+    const payload = JSON.parse(result.content[0]?.text ?? "{}");
+
+    expect(payload.readVerified).toBe(true);
+    expect(payload.checks).toEqual([
+      { name: "app-store-connect-apps", ok: true, status: 200 },
+    ]);
+    expect(appStoreConnectGet).toHaveBeenCalledWith("/apps?limit=1");
+  });
+
+  it("marks Google Play verified only after a real package reviews read succeeds", async () => {
+    googlePlayPackageName.mockReturnValue("com.example.app");
+    googlePlayGet.mockResolvedValue(response());
+
+    const probe = registerAndGetProbe();
+    const result = await probe.execute("test", { connector: "google-play" });
+    const payload = JSON.parse(result.content[0]?.text ?? "{}");
+
+    expect(payload.readVerified).toBe(true);
+    expect(payload.checks).toEqual([
+      { name: "google-play-reviews", ok: true, status: 200 },
+    ]);
+    expect(googlePlayGet).toHaveBeenCalledWith(
+      "/applications/com.example.app/reviews?maxResults=1",
+    );
+  });
+
+  it("does not call Google Play when no package is configured", async () => {
+    googlePlayPackageName.mockImplementation(() => {
+      throw new Error("package missing");
+    });
+
+    const probe = registerAndGetProbe();
+    const result = await probe.execute("test", { connector: "google-play" });
+    const payload = JSON.parse(result.content[0]?.text ?? "{}");
+
+    expect(payload.readVerified).toBe(false);
+    expect(payload.checks).toEqual([]);
+    expect(googlePlayGet).not.toHaveBeenCalled();
   });
 });
