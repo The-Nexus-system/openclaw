@@ -644,6 +644,177 @@
         "deployments.write"
       ],
       "state": "planned"
+    },
+    {
+      "id": "twilio",
+      "provider": "Twilio",
+      "priority": 2,
+      "routes": [
+        "official-rest-api",
+        "twilio-cli",
+        "restricted-api-key",
+        "browser-console-last-resort"
+      ],
+      "credentialEnv": [
+        "TWILIO_ACCOUNT_SID"
+      ],
+      "credentialAlternatives": [
+        [
+          "TWILIO_API_KEY_SID",
+          "TWILIO_API_KEY_SECRET"
+        ],
+        [
+          "TWILIO_AUTH_TOKEN"
+        ]
+      ],
+      "targetCapabilities": [
+        "account.resources.read",
+        "phone-numbers.read",
+        "messages.read",
+        "messages.send",
+        "calls.read",
+        "calls.create"
+      ],
+      "state": "planned"
+    },
+    {
+      "id": "facebook-pages",
+      "provider": "Meta/Facebook",
+      "priority": 2,
+      "routes": [
+        "graph-api",
+        "facebook-login-oauth",
+        "page-access-token",
+        "browser-console-last-resort"
+      ],
+      "credentialAlternatives": [
+        [
+          "META_USER_ACCESS_TOKEN"
+        ],
+        [
+          "META_ACCESS_TOKEN"
+        ]
+      ],
+      "optionalCredentialEnv": [
+        "META_GRAPH_VERSION",
+        "META_PAGE_ID",
+        "META_PAGE_ACCESS_TOKEN"
+      ],
+      "targetCapabilities": [
+        "pages.list",
+        "pages.read",
+        "pages.publish",
+        "pages.comments.read",
+        "pages.comments.write",
+        "pages.insights.read"
+      ],
+      "state": "planned"
+    },
+    {
+      "id": "facebook-personal",
+      "provider": "Meta/Facebook",
+      "priority": 3,
+      "routes": [
+        "controlled-browser"
+      ],
+      "optionalCredentialEnv": [
+        "META_FACEBOOK_PROFILE_URL"
+      ],
+      "targetCapabilities": [
+        "profile.browser.read",
+        "profile.browser.interact"
+      ],
+      "state": "planned"
+    },
+    {
+      "id": "facebook-groups",
+      "provider": "Meta/Facebook",
+      "priority": 3,
+      "routes": [
+        "controlled-browser"
+      ],
+      "optionalCredentialEnv": [
+        "META_FACEBOOK_GROUP_URLS"
+      ],
+      "targetCapabilities": [
+        "groups.browser.read",
+        "groups.browser.post",
+        "groups.browser.comment"
+      ],
+      "state": "planned",
+      "limitations": [
+        "Meta removed the third-party Facebook Groups API and publish_to_groups permission in April 2024; use controlled browser interaction rather than claiming Graph API parity."
+      ]
+    },
+    {
+      "id": "instagram",
+      "provider": "Meta/Instagram",
+      "priority": 2,
+      "routes": [
+        "instagram-api",
+        "facebook-login-oauth",
+        "instagram-login-oauth",
+        "browser-last-resort"
+      ],
+      "credentialAlternatives": [
+        [
+          "INSTAGRAM_ACCESS_TOKEN"
+        ],
+        [
+          "META_USER_ACCESS_TOKEN"
+        ]
+      ],
+      "optionalCredentialEnv": [
+        "META_GRAPH_VERSION",
+        "META_INSTAGRAM_ACCOUNT_ID",
+        "META_PAGE_ID",
+        "META_PAGE_ACCESS_TOKEN"
+      ],
+      "targetCapabilities": [
+        "profile.read",
+        "media.read",
+        "media.publish",
+        "comments.read",
+        "comments.write",
+        "messages.read",
+        "messages.write",
+        "insights.read"
+      ],
+      "state": "planned"
+    },
+    {
+      "id": "threads",
+      "provider": "Meta/Threads",
+      "priority": 2,
+      "routes": [
+        "threads-api",
+        "threads-oauth",
+        "browser-last-resort"
+      ],
+      "credentialEnv": [
+        "THREADS_ACCESS_TOKEN"
+      ],
+      "optionalCredentialEnv": [
+        "THREADS_USER_ID"
+      ],
+      "targetCapabilities": [
+        "profile.read",
+        "threads.read",
+        "threads.publish",
+        "replies.read",
+        "replies.write",
+        "insights.read"
+      ],
+      "state": "planned",
+      "requiredReadScopes": [
+        "threads_basic"
+      ],
+      "requiredWriteScopes": [
+        "threads_content_publish",
+        "threads_read_replies",
+        "threads_manage_replies",
+        "threads_manage_insights"
+      ]
     }
   ]
 }
