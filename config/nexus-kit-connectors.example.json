@@ -935,28 +935,38 @@
       "provider": "Metricool",
       "priority": 2,
       "routes": [
-        "official-api",
-        "browser-console-last-resort"
+        "official-remote-mcp",
+        "mcp-remote-stdio-bridge",
+        "oauth-device-when-supported",
+        "api-key-header-fallback"
       ],
       "credentialEnv": [],
-      "credentialAlternatives": [
-        [
-          "METRICOOL_ACCESS_TOKEN"
-        ],
-        [
-          "METRICOOL_API_TOKEN"
-        ]
+      "optionalCredentialEnv": [
+        "METRICOOL_API_KEY"
+      ],
+      "secretState": [
+        "~/.openclaw/kit/mcp-auth/metricool"
       ],
       "targetCapabilities": [
         "brands.read",
         "analytics.read",
         "scheduled-content.read",
         "scheduled-content.write",
-        "best-times.read"
+        "best-times.read",
+        "inbox.read",
+        "inbox.write",
+        "comments.read",
+        "comments.write",
+        "smartlinks.read",
+        "smartlinks.write",
+        "ads.read"
       ],
       "state": "planned",
       "notes": [
-        "Do not mark verified until a real Metricool account/brand read succeeds."
+        "Primary route uses Metricool's official remote MCP endpoint through a stdio bridge so OpenClaw's embedded Pi runtime can consume it.",
+        "OAuth works on any Metricool plan, but headless device authorization counts only if Metricool advertises RFC 8628 support; otherwise the setup helper fails closed.",
+        "METRICOOL_API_KEY is an optional header-auth fallback and may require a Metricool plan with API access.",
+        "Do not mark verified until the MCP server lists tools and a harmless real brand/account read succeeds."
       ]
     },
     {
