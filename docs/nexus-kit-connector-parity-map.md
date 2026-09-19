@@ -41,11 +41,23 @@ Gmail plain-text send is implemented as an optional consequential tool:
 
 The runtime still needs an independently authorized Google OAuth grant with the required scopes.
 
+### Microsoft Graph
+
+Independent OAuth refresh and read routing are implemented for Microsoft Graph.
+
+Tools:
+
+- `nexus_microsoft_graph_get`
+- `nexus_connector_probe` with `microsoft-graph`
+
+The health probe requires identity, Outlook inbox, and calendar reads to succeed before it reports read verification. Failures identify the stage as credentials, token refresh, identity, mail, or calendar.
+
+Runtime state remains unverified until the OpenClaw host receives an independent Microsoft OAuth grant and the live probe succeeds.
+
 ## Next parity group
 
-The next adapters to build are:
+The next adapters to finish are:
 
-- Microsoft Graph for Outlook mail/calendar
 - Dropbox
 - Notion
 - Linear
