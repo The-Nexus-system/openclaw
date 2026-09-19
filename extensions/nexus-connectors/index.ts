@@ -10,6 +10,10 @@ type ConnectorRecord = {
   priority?: number;
   routes?: string[];
   credentialEnv?: string[];
+  credentialAlternatives?: string[][];
+  optionalCredentialEnv?: string[];
+  requiredReadScopes?: string[];
+  requiredWriteScopes?: string[];
   targetCapabilities?: string[];
   state?: string;
 };
@@ -346,8 +350,17 @@ export default definePluginEntry({
           .filter((item) => !requested || item.id.toLowerCase() === requested)
           .map((item) => {
             const markers = item.credentialEnv ?? [];
+            const alternatives = item.credentialAlternatives ?? [];
+            const optionalMarkers = item.optionalCredentialEnv ?? [];
             const credentialMarkers = Object.fromEntries(
               markers.map((name) => [name, Boolean(process.env[name])]),
+            );
+            const alternativeStatus = alternatives.map((group) => ({
+              markers: Object.fromEntries(group.map((name) => [name, Boolean(process.env[name])])),
+              satisfied: group.every((name) => Boolean(process.env[name])),
+            }));
+            const optionalCredentialMarkers = Object.fromEntries(
+              optionalMarkers.map((name) => [name, Boolean(process.env[name])]),
             );
 
             return {
@@ -358,6 +371,10 @@ export default definePluginEntry({
               routes: item.routes ?? [],
               targetCapabilities: item.targetCapabilities ?? [],
               credentialMarkers,
+              credentialAlternatives: alternativeStatus,
+              optionalCredentialMarkers,
+              requiredReadScopes: item.requiredReadScopes ?? [],
+              requiredWriteScopes: item.requiredWriteScopes ?? [],
               liveProviderVerified: false,
             };
           });
