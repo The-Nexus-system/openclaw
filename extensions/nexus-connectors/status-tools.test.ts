@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/plugin-entry";
 
-const providerGet = vi.fn();
-const getMicrosoftAccessToken = vi.fn();
+const { providerGet, getMicrosoftAccessToken } = vi.hoisted(() => ({
+  providerGet: vi.fn(),
+  getMicrosoftAccessToken: vi.fn(),
+}));
 
 vi.mock("./shared.js", () => ({
   resolveRegistryPath: vi.fn(() => "/tmp/connectors.json"),
