@@ -350,5 +350,4 @@ export function registerStatusTools(api: OpenClawPluginApi) {
       },
     });
 
-    api.registerTool({
 }
