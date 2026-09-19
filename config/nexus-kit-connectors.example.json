@@ -377,15 +377,35 @@
         "official-api",
         "openclaw-plugin"
       ],
-      "credentialEnv": [
-        "CANVA_CLIENT_ID",
-        "CANVA_CLIENT_SECRET"
-      ],
+      "credentialEnv": [],
       "targetCapabilities": [
         "designs.read",
         "designs.write"
       ],
-      "state": "planned"
+      "state": "planned",
+      "credentialAlternatives": [
+        [
+          "CANVA_ACCESS_TOKEN"
+        ],
+        [
+          "CANVA_CLIENT_ID",
+          "CANVA_CLIENT_SECRET",
+          "CANVA_REFRESH_TOKEN"
+        ]
+      ],
+      "requiredReadScopes": [
+        "design:meta:read"
+      ],
+      "optionalReadScopes": [
+        "profile:read"
+      ],
+      "secretState": [
+        "~/.openclaw/kit/secrets/canva.json"
+      ],
+      "notes": [
+        "Refresh-token rotation is persisted in private host state and never committed to Git.",
+        "The identity probe uses /rest/v1/users/me, which requires no specific scope."
+      ]
     },
     {
       "id": "adobe",
