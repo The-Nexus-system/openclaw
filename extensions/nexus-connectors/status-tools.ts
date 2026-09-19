@@ -15,6 +15,7 @@ import {
   getZoomAccessToken,
   zoomTargetUser,
   runExpoProjectRead,
+  spotifyGet,
 } from "./shared.js";
 import {
   appStoreConnectGet,
@@ -168,6 +169,7 @@ export function registerStatusTools(api: OpenClawPluginApi) {
           Type.Literal("meta-developer"),
           Type.Literal("app-store-connect"),
           Type.Literal("google-play"),
+          Type.Literal("spotify"),
         ]),
       }),
       async execute(_id, params) {
@@ -452,6 +454,17 @@ export function registerStatusTools(api: OpenClawPluginApi) {
               throw new ConnectorProbeError(
                 "reviews",
                 `Google Play reviews probe failed with HTTP ${result.status}`,
+              );
+            }
+          }
+
+          if (params.connector === "spotify") {
+            const result = await spotifyGet("/me");
+            checks.push({ name: "spotify-profile", ok: result.ok, status: result.status });
+            if (!result.ok) {
+              throw new ConnectorProbeError(
+                "profile",
+                `Spotify profile probe failed with HTTP ${result.status}`,
               );
             }
           }
