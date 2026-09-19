@@ -13,6 +13,7 @@ import {
 } from "./shared.js";
 
 export function registerGeneralTools(api: OpenClawPluginApi) {
+    api.registerTool({
       name: "nexus_github_get",
       description:
         "Perform an independently authenticated read-only GET against the GitHub REST API using GITHUB_TOKEN on the OpenClaw host. This does not use a ChatGPT connector.",
@@ -392,5 +393,4 @@ export function registerGeneralTools(api: OpenClawPluginApi) {
       },
     });
 
-    api.registerTool({
 }
