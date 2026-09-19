@@ -2,44 +2,51 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 import shutil
-import sys
 
 from nexus_kit_secret_store import get
 
+MCP_REMOTE_VERSION = "0.1.38"
+METRICOOL_MCP_URL = "https://ai.metricool.com/mcp"
+
 
 def main() -> None:
-    token = get("METRICOOL_USER_TOKEN")
-    user_id = get("METRICOOL_USER_ID")
+    npx = shutil.which("npx")
+    if not npx:
+        raise SystemExit("Metricool MCP requires Node.js/npx on the OpenClaw host.")
 
-    missing = [
-        name
-        for name, value in [
-            ("METRICOOL_USER_TOKEN", token),
-            ("METRICOOL_USER_ID", user_id),
-        ]
-        if not value
-    ]
-    if missing:
-        raise SystemExit(
-            "Metricool MCP is not configured. Missing: " + ", ".join(missing)
-        )
-
-    uvx = shutil.which("uvx")
-    if not uvx:
-        raise SystemExit(
-            "Metricool MCP requires uvx on the OpenClaw host. Install uv/uvx first."
-        )
+    state_dir = Path.home() / ".openclaw" / "kit" / "mcp-auth" / "metricool"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    if os.name != "nt":
+        os.chmod(state_dir, 0o700)
 
     env = os.environ.copy()
-    env["METRICOOL_USER_TOKEN"] = str(token)
-    env["METRICOOL_USER_ID"] = str(user_id)
+    env["MCP_REMOTE_CONFIG_DIR"] = str(state_dir)
 
-    os.execve(
-        uvx,
-        [uvx, "mcp-metricool"],
-        env,
-    )
+    args = [
+        npx,
+        "-y",
+        f"mcp-remote@{MCP_REMOTE_VERSION}",
+        METRICOOL_MCP_URL,
+        "--transport",
+        "http-first",
+    ]
+
+    api_key = get("METRICOOL_API_KEY")
+    if api_key:
+        header_file = state_dir / "headers.txt"
+        header_file.write_text(f"X-Mc-Auth: {api_key}\n", encoding="utf-8")
+        if os.name != "nt":
+            os.chmod(header_file, 0o600)
+        args.extend(["--header-file", str(header_file), "--silent"])
+    else:
+        # Headless-friendly OAuth. This succeeds only if Metricool advertises
+        # RFC 8628 device authorization. nexus-kit-auth metricool performs the
+        # first interactive authorization and stores mcp-remote's token cache.
+        args.append("--device-code")
+
+    os.execve(npx, args, env)
 
 
 if __name__ == "__main__":
