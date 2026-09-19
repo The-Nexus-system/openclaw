@@ -49,6 +49,7 @@ fi
 
 if command -v openclaw >/dev/null 2>&1; then
   openclaw approvals allowlist add --agent "*" "*/clawteam" >/dev/null 2>&1 || true
+  openclaw plugins enable nexus-connectors >/dev/null 2>&1 || true
 fi
 
 clawteam config set transport file >/dev/null 2>&1 || true
@@ -58,8 +59,12 @@ clawteam config health
 
 NEXUS_CONNECTOR_REGISTRY="$CONNECTOR_STATE_DIR/connectors.json"   "$REPO_ROOT/scripts/nexus-kit-connector-audit.sh" || true
 
+if command -v openclaw >/dev/null 2>&1; then
+  openclaw plugins inspect nexus-connectors --json >/dev/null 2>&1 || true
+fi
+
 echo "Kit gateway integration ready."
 echo "OpenClaw remains the persistent gateway."
 echo "ClawTeam is installed and available for on-demand worker spawning."
-echo "Connector registry is present at $CONNECTOR_STATE_DIR/connectors.json."
+echo "Nexus connector routing is installed and the connector registry is present at $CONNECTOR_STATE_DIR/connectors.json."
 echo "Connector credentials are not stored in Git and must be configured independently."
