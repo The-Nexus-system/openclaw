@@ -13,6 +13,8 @@ BIN_DIR="$HOME/bin"
 
 mkdir -p "$BASE_DIR" "$CLAWTEAM_SKILL_DIR" "$CONNECTOR_SKILL_DIR" "$CONNECTOR_STATE_DIR" "$BIN_DIR"
 
+python3 "$REPO_ROOT/scripts/nexus-kit-secret" init
+
 if [ -d "$CLAWTEAM_DIR/.git" ]; then
   git -C "$CLAWTEAM_DIR" fetch --prune origin
   git -C "$CLAWTEAM_DIR" checkout main
