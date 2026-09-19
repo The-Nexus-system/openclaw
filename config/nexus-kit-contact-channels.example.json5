@@ -1,0 +1,31 @@
+{
+  // Public-safe template only. Keep real user IDs, phone numbers, and secrets out of Git.
+  channels: {
+    telegram: {
+      enabled: true,
+      botToken: {
+        source: "env",
+        provider: "default",
+        id: "TELEGRAM_BOT_TOKEN",
+      },
+      dmPolicy: "allowlist",
+      allowFrom: [
+        // "<numeric Telegram owner user id>"
+      ],
+      groupPolicy: "allowlist",
+      groups: {},
+    },
+
+    whatsapp: {
+      dmPolicy: "allowlist",
+      allowFrom: [
+        // "+1..."
+      ],
+      groupPolicy: "allowlist",
+      groupAllowFrom: [
+        // "+1..."
+      ],
+      groups: {},
+    },
+  },
+}
