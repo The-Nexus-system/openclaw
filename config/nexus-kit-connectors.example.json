@@ -500,11 +500,10 @@
       ],
       "targetCapabilities": [
         "models.list",
+        "models.read",
         "responses.create",
         "files.read",
-        "files.write",
-        "project.resources.read",
-        "project.resources.write"
+        "files.write"
       ],
       "state": "planned",
       "requiredReadScopes": [
@@ -512,6 +511,10 @@
       ],
       "requiredWriteScopes": [
         "project-api-key"
+      ],
+      "notes": [
+        "Prefer a dedicated project service-account API key for the persistent Kit runtime.",
+        "A normal project API key is not an OpenAI Admin API key; organization/project administration should use a separate admin credential and adapter."
       ]
     },
     {
@@ -568,28 +571,36 @@
       ],
       "credentialAlternatives": [
         [
-          "META_ACCESS_TOKEN"
+          "META_APP_ID",
+          "META_APP_ACCESS_TOKEN"
         ],
         [
           "META_APP_ID",
-          "META_APP_SECRET",
+          "META_APP_SECRET"
+        ],
+        [
+          "META_APP_ID",
           "META_USER_ACCESS_TOKEN"
+        ],
+        [
+          "META_APP_ID",
+          "META_ACCESS_TOKEN"
         ]
       ],
       "optionalCredentialEnv": [
-        "META_BUSINESS_ID",
-        "META_PAGE_ID",
-        "META_INSTAGRAM_ACCOUNT_ID"
+        "META_GRAPH_VERSION",
+        "META_BUSINESS_ID"
       ],
       "targetCapabilities": [
         "apps.read",
-        "graph.read",
-        "pages.read",
-        "pages.write",
-        "instagram.read",
-        "instagram.write"
+        "graph.read"
       ],
-      "state": "planned"
+      "state": "planned",
+      "credentialEnv": [],
+      "notes": [
+        "Developer-app verification is separate from Facebook Page, Instagram, and Threads authorization.",
+        "Default Graph API version is v26.0 unless META_GRAPH_VERSION is explicitly set."
+      ]
     },
     {
       "id": "app-store-connect",
