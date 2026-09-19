@@ -605,6 +605,45 @@
         "assets.write"
       ],
       "state": "planned"
+    },
+    {
+      "id": "expo-eas",
+      "provider": "Expo",
+      "priority": 1,
+      "routes": [
+        "eas-cli",
+        "eas-rest-api",
+        "robot-user-token",
+        "personal-access-token",
+        "browser-console-last-resort"
+      ],
+      "credentialEnv": [
+        "EXPO_TOKEN"
+      ],
+      "optionalCredentialEnv": [
+        "EXPO_ACCOUNT",
+        "EXPO_PROJECT_ID",
+        "EXPO_PROJECT_DIR"
+      ],
+      "targetCapabilities": [
+        "account.read",
+        "project.read",
+        "project.status",
+        "builds.read",
+        "builds.create",
+        "updates.read",
+        "updates.publish",
+        "submissions.read",
+        "submissions.create",
+        "metadata.read",
+        "metadata.write",
+        "credentials.manage",
+        "workflows.read",
+        "workflows.dispatch",
+        "deployments.read",
+        "deployments.write"
+      ],
+      "state": "planned"
     }
   ]
 }
