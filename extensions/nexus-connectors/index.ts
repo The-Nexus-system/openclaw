@@ -365,6 +365,85 @@ async function linearGraphql(query: string, variables: Record<string, unknown> =
     graphqlErrors,
   };
 }
+async function getZoomAccessToken(): Promise<{ token: string; mode: "direct" | "refresh" | "server-to-server" }> {
+  const direct = process.env.ZOOM_ACCESS_TOKEN;
+  if (direct) return { token: direct, mode: "direct" };
+
+  const clientId = process.env.ZOOM_CLIENT_ID;
+  const clientSecret = process.env.ZOOM_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    throw new Error(
+      "Configure ZOOM_ACCESS_TOKEN or ZOOM_CLIENT_ID and ZOOM_CLIENT_SECRET on the OpenClaw host.",
+    );
+  }
+
+  const basic = Buffer.from(`${clientId}:${clientSecret}`, "utf8").toString("base64");
+  const refreshToken = process.env.ZOOM_REFRESH_TOKEN;
+
+  if (refreshToken) {
+    const response = await fetch(
+      `https://zoom.us/oauth/token?grant_type=refresh_token&refresh_token=${encodeURIComponent(refreshToken)}`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${basic}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        redirect: "error",
+      },
+    );
+    const data = (await response.json().catch(() => ({}))) as {
+      access_token?: string;
+      error?: string;
+      reason?: string;
+    };
+    if (!response.ok || !data.access_token) {
+      throw new Error(data.reason ?? data.error ?? `Zoom OAuth HTTP ${response.status}`);
+    }
+    return { token: data.access_token, mode: "refresh" };
+  }
+
+  const accountId = process.env.ZOOM_ACCOUNT_ID;
+  if (!accountId) {
+    throw new Error(
+      "ZOOM_ACCOUNT_ID is required for Zoom server-to-server OAuth when no direct or refresh token is configured.",
+    );
+  }
+
+  const response = await fetch(
+    `https://zoom.us/oauth/token?grant_type=account_credentials&account_id=${encodeURIComponent(accountId)}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${basic}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      redirect: "error",
+    },
+  );
+  const data = (await response.json().catch(() => ({}))) as {
+    access_token?: string;
+    error?: string;
+    reason?: string;
+  };
+  if (!response.ok || !data.access_token) {
+    throw new Error(data.reason ?? data.error ?? `Zoom server OAuth HTTP ${response.status}`);
+  }
+  return { token: data.access_token, mode: "server-to-server" };
+}
+
+function zoomTargetUser(mode: "direct" | "refresh" | "server-to-server", explicit?: string): string {
+  const requested = explicit?.trim();
+  if (requested) return requested;
+  if (mode === "server-to-server") {
+    const configured = process.env.ZOOM_USER_ID?.trim();
+    if (!configured) {
+      throw new Error("ZOOM_USER_ID or an explicit userId is required for server-to-server Zoom access.");
+    }
+    return configured;
+  }
+  return "me";
+}
 
 export default definePluginEntry({
   id: "nexus-connectors",
@@ -485,6 +564,7 @@ export default definePluginEntry({
           Type.Literal("dropbox"),
           Type.Literal("notion"),
           Type.Literal("linear"),
+          Type.Literal("zoom"),
         ]),
       }),
       async execute(_id, params) {
@@ -564,6 +644,20 @@ export default definePluginEntry({
               );
               checks.push({ name: "people-me", ok: result.ok, status: result.status });
             }
+          }
+
+          if (params.connector === "zoom") {
+            const auth = await getZoomAccessToken();
+            const userId = zoomTargetUser(auth.mode);
+            const result = await providerGet(
+              `https://api.zoom.us/v2/users/${encodeURIComponent(userId)}/meetings?type=previous_meetings&page_size=1`,
+              {
+                Authorization: `Bearer ${auth.token}`,
+                Accept: "application/json",
+                "User-Agent": "nexus-kit-openclaw",
+              },
+            );
+            checks.push({ name: "zoom-meetings", ok: result.ok, status: result.status });
           }
 
           if (params.connector === "linear") {
@@ -768,6 +862,60 @@ export default definePluginEntry({
       },
     });
 
+
+    api.registerTool({
+      name: "nexus_zoom_read",
+      description:
+        "Read Zoom through an independently authenticated OpenClaw route. Supports user details, meeting lists, and cloud recordings without using a ChatGPT connector.",
+      parameters: Type.Object({
+        operation: Type.Union([
+          Type.Literal("user"),
+          Type.Literal("meetings"),
+          Type.Literal("recordings"),
+        ]),
+        userId: Type.Optional(Type.String()),
+        pageSize: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
+        from: Type.Optional(Type.String({ description: "Optional YYYY-MM-DD start date for recordings." })),
+        to: Type.Optional(Type.String({ description: "Optional YYYY-MM-DD end date for recordings." })),
+      }),
+      async execute(_id, params) {
+        try {
+          const auth = await getZoomAccessToken();
+          const userId = zoomTargetUser(auth.mode, params.userId);
+          const headers = {
+            Authorization: `Bearer ${auth.token}`,
+            Accept: "application/json",
+            "User-Agent": "nexus-kit-openclaw",
+          };
+
+          let url: string;
+          if (params.operation === "user") {
+            url = `https://api.zoom.us/v2/users/${encodeURIComponent(userId)}`;
+          } else if (params.operation === "meetings") {
+            url =
+              `https://api.zoom.us/v2/users/${encodeURIComponent(userId)}/meetings` +
+              `?type=previous_meetings&page_size=${params.pageSize ?? 20}`;
+          } else {
+            const query = new URLSearchParams({
+              page_size: String(params.pageSize ?? 20),
+            });
+            if (params.from?.trim()) query.set("from", params.from.trim());
+            if (params.to?.trim()) query.set("to", params.to.trim());
+            url =
+              `https://api.zoom.us/v2/users/${encodeURIComponent(userId)}/recordings?` +
+              query.toString();
+          }
+
+          const result = await providerGet(url, headers);
+          return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return {
+            content: [{ type: "text", text: JSON.stringify({ ok: false, error: message }) }],
+          };
+        }
+      },
+    });
 
     api.registerTool({
       name: "nexus_linear_read",
