@@ -218,6 +218,12 @@ export function registerStatusTools(api: OpenClawPluginApi) {
               figmaHeaders(),
             );
             checks.push({ name: "figma-me", ok: result.ok, status: result.status });
+            if (!result.ok) {
+              throw new ConnectorProbeError(
+                "account",
+                `Figma account probe failed with HTTP ${result.status}`,
+              );
+            }
           }
 
           if (params.connector === "zoom") {
@@ -232,6 +238,12 @@ export function registerStatusTools(api: OpenClawPluginApi) {
               },
             );
             checks.push({ name: "zoom-meetings", ok: result.ok, status: result.status });
+            if (!result.ok) {
+              throw new ConnectorProbeError(
+                "meetings",
+                `Zoom meetings probe failed with HTTP ${result.status}`,
+              );
+            }
           }
 
           if (params.connector === "linear") {
@@ -239,6 +251,12 @@ export function registerStatusTools(api: OpenClawPluginApi) {
               "query NexusKitViewer { viewer { id name email } }",
             );
             checks.push({ name: "linear-viewer", ok: result.ok, status: result.status });
+            if (!result.ok) {
+              throw new ConnectorProbeError(
+                "viewer",
+                `Linear viewer probe failed with HTTP ${result.status}`,
+              );
+            }
           }
 
           if (params.connector === "notion") {
@@ -247,6 +265,12 @@ export function registerStatusTools(api: OpenClawPluginApi) {
               notionHeaders(),
             );
             checks.push({ name: "notion-user", ok: result.ok, status: result.status });
+            if (!result.ok) {
+              throw new ConnectorProbeError(
+                "user",
+                `Notion user probe failed with HTTP ${result.status}`,
+              );
+            }
           }
 
           if (params.connector === "dropbox") {
