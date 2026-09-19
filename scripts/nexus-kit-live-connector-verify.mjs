@@ -1,641 +1,209 @@
 #!/usr/bin/env node
 
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
+import { spawnSync } from "node:child_process";
 
 const target = (process.argv[2] || "all").toLowerCase();
+
+const PROBES = [
+  "github",
+  "digitalocean",
+  "gmail",
+  "google-calendar",
+  "google-drive",
+  "google-contacts",
+  "microsoft-graph",
+  "dropbox",
+  "notion",
+  "linear",
+  "zoom",
+  "figma",
+  "canva",
+  "adobe-photoshop",
+  "expo-eas",
+  "twilio",
+  "facebook-pages",
+  "instagram",
+  "threads",
+  "spotify",
+  "openai-api",
+  "meta-developer",
+  "app-store-connect",
+  "google-play",
+];
 
 function out(record) {
   process.stdout.write(JSON.stringify(record) + "\n");
 }
 
-function secretStateDir() {
-  return (
-    process.env.NEXUS_KIT_SECRET_STATE_DIR?.trim() ||
-    path.join(os.homedir(), ".openclaw", "kit", "secrets")
-  );
-}
-
-function readSecretState(name) {
+function parseNestedJson(value) {
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  if (!trimmed || (!trimmed.startsWith("{") && !trimmed.startsWith("["))) {
+    return value;
+  }
   try {
-    return JSON.parse(
-      fs.readFileSync(path.join(secretStateDir(), `${name}.json`), "utf8"),
-    );
+    return JSON.parse(trimmed);
   } catch {
-    return {};
+    return value;
   }
 }
 
-function writeSecretState(name, value) {
-  const dir = secretStateDir();
-  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-  const file = path.join(dir, `${name}.json`);
-  const temp = `${file}.tmp`;
-  fs.writeFileSync(temp, JSON.stringify(value, null, 2) + "\n", {
-    encoding: "utf8",
-    mode: 0o600,
-  });
-  fs.chmodSync(temp, 0o600);
-  fs.renameSync(temp, file);
-}
+function findField(value, field) {
+  value = parseNestedJson(value);
 
-async function getJson(url, headers) {
-  const response = await fetch(url, { method: "GET", headers, redirect: "error" });
-  const text = await response.text();
-  let body = text;
-  try {
-    body = text ? JSON.parse(text) : null;
-  } catch {
-    // Keep non-JSON text.
-  }
-  return { ok: response.ok, status: response.status, body };
-}
-
-async function adobePhotoshopToken() {
-  if (process.env.ADOBE_PHOTOSHOP_ACCESS_TOKEN) {
-    return process.env.ADOBE_PHOTOSHOP_ACCESS_TOKEN;
-  }
-
-  const clientId = process.env.ADOBE_PHOTOSHOP_CLIENT_ID;
-  const clientSecret = process.env.ADOBE_PHOTOSHOP_CLIENT_SECRET;
-  if (!clientId || !clientSecret) return null;
-
-  const body = new URLSearchParams({
-    grant_type: "client_credentials",
-    client_id: clientId,
-    client_secret: clientSecret,
-    scope:
-      process.env.ADOBE_PHOTOSHOP_SCOPES?.trim() ||
-      "openid,AdobeID,read_organizations",
-  });
-
-  const response = await fetch("https://ims-na1.adobelogin.com/ims/token/v3", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString(),
-    redirect: "error",
-  });
-
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok || !data.access_token) {
-    throw new Error(
-      data.error_description || data.error || `Adobe IMS HTTP ${response.status}`,
-    );
-  }
-  return data.access_token;
-}
-
-async function canvaToken() {
-  if (process.env.CANVA_ACCESS_TOKEN) return process.env.CANVA_ACCESS_TOKEN;
-
-  const clientId = process.env.CANVA_CLIENT_ID;
-  const clientSecret = process.env.CANVA_CLIENT_SECRET;
-  const stored = readSecretState("canva");
-  const refreshToken =
-    (typeof stored.refresh_token === "string" ? stored.refresh_token : undefined) ||
-    process.env.CANVA_REFRESH_TOKEN;
-
-  if (!clientId || !clientSecret || !refreshToken) return null;
-
-  const basic = Buffer.from(`${clientId}:${clientSecret}`, "utf8").toString("base64");
-  const body = new URLSearchParams({
-    grant_type: "refresh_token",
-    refresh_token: refreshToken,
-  });
-
-  const response = await fetch("https://api.canva.com/rest/v1/oauth/token", {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${basic}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: body.toString(),
-    redirect: "error",
-  });
-
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok || !data.access_token) {
-    throw new Error(
-      data.error_description || data.error || `Canva OAuth HTTP ${response.status}`,
-    );
-  }
-
-  if (data.refresh_token) {
-    writeSecretState("canva", {
-      refresh_token: data.refresh_token,
-      updated_at: new Date().toISOString(),
-      scope: data.scope || null,
-    });
-  }
-
-  return data.access_token;
-}
-
-async function googleToken() {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
-
-  if (!clientId || !clientSecret || !refreshToken) return null;
-
-  const body = new URLSearchParams({
-    client_id: clientId,
-    client_secret: clientSecret,
-    refresh_token: refreshToken,
-    grant_type: "refresh_token",
-  });
-
-  const response = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString(),
-    redirect: "error",
-  });
-
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok || !data.access_token) {
-    throw new Error(data.error_description || data.error || `Google OAuth HTTP ${response.status}`);
-  }
-
-  return data.access_token;
-}
-
-async function zoomAccess() {
-  if (process.env.ZOOM_ACCESS_TOKEN) {
-    return { token: process.env.ZOOM_ACCESS_TOKEN, mode: "direct" };
-  }
-
-  const clientId = process.env.ZOOM_CLIENT_ID;
-  const clientSecret = process.env.ZOOM_CLIENT_SECRET;
-  if (!clientId || !clientSecret) return null;
-
-  const basic = Buffer.from(`${clientId}:${clientSecret}`, "utf8").toString("base64");
-
-  if (process.env.ZOOM_REFRESH_TOKEN) {
-    const response = await fetch(
-      `https://zoom.us/oauth/token?grant_type=refresh_token&refresh_token=${encodeURIComponent(process.env.ZOOM_REFRESH_TOKEN)}`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${basic}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        redirect: "error",
-      },
-    );
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data.access_token) {
-      throw new Error(data.reason || data.error || `Zoom OAuth HTTP ${response.status}`);
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findField(item, field);
+      if (found !== undefined) return found;
     }
-    return { token: data.access_token, mode: "refresh" };
+    return undefined;
   }
 
-  if (!process.env.ZOOM_ACCOUNT_ID) return null;
-
-  const response = await fetch(
-    `https://zoom.us/oauth/token?grant_type=account_credentials&account_id=${encodeURIComponent(process.env.ZOOM_ACCOUNT_ID)}`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${basic}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      redirect: "error",
-    },
-  );
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok || !data.access_token) {
-    throw new Error(data.reason || data.error || `Zoom server OAuth HTTP ${response.status}`);
+  if (value && typeof value === "object") {
+    if (Object.prototype.hasOwnProperty.call(value, field)) {
+      return value[field];
+    }
+    for (const child of Object.values(value)) {
+      const found = findField(child, field);
+      if (found !== undefined) return found;
+    }
   }
-  return { token: data.access_token, mode: "server-to-server" };
+
+  return undefined;
 }
 
-async function dropboxToken() {
-  if (process.env.DROPBOX_ACCESS_TOKEN) return process.env.DROPBOX_ACCESS_TOKEN;
+function collectText(value, output = []) {
+  value = parseNestedJson(value);
 
-  const appKey = process.env.DROPBOX_APP_KEY;
-  const appSecret = process.env.DROPBOX_APP_SECRET;
-  const refreshToken = process.env.DROPBOX_REFRESH_TOKEN;
-  if (!appKey || !appSecret || !refreshToken) return null;
-
-  const body = new URLSearchParams({
-    grant_type: "refresh_token",
-    refresh_token: refreshToken,
-    client_id: appKey,
-    client_secret: appSecret,
-  });
-
-  const response = await fetch("https://api.dropboxapi.com/oauth2/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString(),
-    redirect: "error",
-  });
-
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok || !data.access_token) {
-    throw new Error(
-      data.error_description || data.error || `Dropbox OAuth HTTP ${response.status}`,
-    );
+  if (typeof value === "string") {
+    output.push(value);
+    return output;
   }
-  return data.access_token;
+
+  if (Array.isArray(value)) {
+    for (const item of value) collectText(item, output);
+    return output;
+  }
+
+  if (value && typeof value === "object") {
+    for (const child of Object.values(value)) collectText(child, output);
+  }
+
+  return output;
 }
 
-async function microsoftToken() {
-  const clientId = process.env.MICROSOFT_CLIENT_ID;
-  const refreshToken = process.env.MICROSOFT_REFRESH_TOKEN;
-  const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
-  const tenant = process.env.MICROSOFT_TENANT_ID?.trim() || "common";
+function looksUnconfigured(value) {
+  const text = collectText(value).join(" ").toLowerCase();
+  return [
+    "not configured",
+    "must be configured",
+    "is required",
+    "missing",
+    "does not exist",
+    "not installed",
+    "not available in path",
+    "must point to",
+  ].some((marker) => text.includes(marker));
+}
 
-  if (!clientId || !refreshToken) return null;
-
-  const body = new URLSearchParams({
-    client_id: clientId,
-    refresh_token: refreshToken,
-    grant_type: "refresh_token",
-    scope:
-      process.env.MICROSOFT_SCOPES?.trim() ||
-      "openid offline_access User.Read Mail.Read Calendars.Read",
+function invokeProbe(connector) {
+  const params = JSON.stringify({
+    name: "nexus_connector_probe",
+    args: { connector },
   });
-  if (clientSecret) body.set("client_secret", clientSecret);
 
-  const response = await fetch(
-    `https://login.microsoftonline.com/${encodeURIComponent(tenant)}/oauth2/v2.0/token`,
+  const proc = spawnSync(
+    "openclaw",
+    [
+      "gateway",
+      "call",
+      "tools.invoke",
+      "--params",
+      params,
+      "--json",
+      "--timeout",
+      "60000",
+    ],
     {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: body.toString(),
-      redirect: "error",
+      encoding: "utf8",
+      maxBuffer: 8 * 1024 * 1024,
+      env: process.env,
     },
   );
 
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok || !data.access_token) {
-    throw new Error(
-      data.error_description || data.error || `Microsoft OAuth HTTP ${response.status}`,
-    );
-  }
-
-  return data.access_token;
-}
-
-async function probeGithub() {
-  const token = process.env.GITHUB_TOKEN;
-  if (!token) return { connector: "github", state: "unconfigured" };
-
-  const result = await getJson("https://api.github.com/user", {
-    Authorization: `Bearer ${token}`,
-    Accept: "application/vnd.github+json",
-    "X-GitHub-Api-Version": "2022-11-28",
-    "User-Agent": "nexus-kit-openclaw",
-  });
-
-  return {
-    connector: "github",
-    state: result.ok ? "read-verified" : "failed",
-    checks: [{ endpoint: "/user", ok: result.ok, status: result.status }],
-  };
-}
-
-async function probeDigitalOcean() {
-  const token = process.env.DIGITALOCEAN_ACCESS_TOKEN;
-  if (!token) return { connector: "digitalocean", state: "unconfigured" };
-
-  const result = await getJson("https://api.digitalocean.com/v2/account", {
-    Authorization: `Bearer ${token}`,
-    Accept: "application/json",
-    "User-Agent": "nexus-kit-openclaw",
-  });
-
-  return {
-    connector: "digitalocean",
-    state: result.ok ? "read-verified" : "failed",
-    checks: [{ endpoint: "/v2/account", ok: result.ok, status: result.status }],
-  };
-}
-
-async function probeGoogle(kind) {
-  const token = await googleToken();
-  if (!token) return { connector: kind, state: "unconfigured" };
-
-  const headers = {
-    Authorization: `Bearer ${token}`,
-    Accept: "application/json",
-    "User-Agent": "nexus-kit-openclaw",
-  };
-
-  const endpoints = {
-    gmail: [
-      ["gmail-profile", "https://gmail.googleapis.com/gmail/v1/users/me/profile"],
-    ],
-    "google-calendar": [
-      [
-        "calendar-list",
-        "https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=1",
-      ],
-    ],
-    "google-drive": [
-      [
-        "drive-files",
-        "https://www.googleapis.com/drive/v3/files?pageSize=1&fields=files(id,name)",
-      ],
-    ],
-    "google-contacts": [
-      [
-        "people-me",
-        "https://people.googleapis.com/v1/people/me?personFields=names,emailAddresses",
-      ],
-    ],
-  };
-
-  const checks = [];
-  for (const [name, url] of endpoints[kind]) {
-    const result = await getJson(url, headers);
-    checks.push({ endpoint: name, ok: result.ok, status: result.status });
-  }
-
-  return {
-    connector: kind,
-    state: checks.every((check) => check.ok) ? "read-verified" : "failed",
-    checks,
-  };
-}
-
-async function probeAdobePhotoshop() {
-  const token = await adobePhotoshopToken();
-  const clientId = process.env.ADOBE_PHOTOSHOP_CLIENT_ID;
-
-  if (!token || !clientId) {
-    return { connector: "adobe-photoshop", state: "unconfigured" };
-  }
-
-  const result = await getJson("https://image.adobe.io/pie/psdService/hello", {
-    Authorization: `Bearer ${token}`,
-    "x-api-key": clientId,
-    Accept: "application/json, text/plain;q=0.9",
-    "User-Agent": "nexus-kit-openclaw",
-  });
-
-  return {
-    connector: "adobe-photoshop",
-    state: result.ok ? "read-verified" : "failed",
-    checks: [
-      {
-        endpoint: "/pie/psdService/hello",
-        ok: result.ok,
-        status: result.status,
-      },
-    ],
-  };
-}
-
-async function probeCanva() {
-  const token = await canvaToken();
-  if (!token) return { connector: "canva", state: "unconfigured" };
-
-  const result = await getJson("https://api.canva.com/rest/v1/users/me", {
-    Authorization: `Bearer ${token}`,
-    Accept: "application/json",
-    "User-Agent": "nexus-kit-openclaw",
-  });
-
-  return {
-    connector: "canva",
-    state: result.ok ? "read-verified" : "failed",
-    checks: [
-      {
-        endpoint: "/rest/v1/users/me",
-        ok: result.ok,
-        status: result.status,
-      },
-    ],
-  };
-}
-
-async function probeFigma() {
-  const personalToken = process.env.FIGMA_TOKEN;
-  const oauthToken = process.env.FIGMA_ACCESS_TOKEN;
-  if (!personalToken && !oauthToken) {
-    return { connector: "figma", state: "unconfigured" };
-  }
-
-  const result = await getJson("https://api.figma.com/v1/me", {
-    ...(oauthToken
-      ? { Authorization: `Bearer ${oauthToken}` }
-      : { "X-Figma-Token": personalToken }),
-    Accept: "application/json",
-    "User-Agent": "nexus-kit-openclaw",
-  });
-
-  return {
-    connector: "figma",
-    state: result.ok ? "read-verified" : "failed",
-    checks: [{ endpoint: "/v1/me", ok: result.ok, status: result.status }],
-  };
-}
-
-async function probeZoom() {
-  const auth = await zoomAccess();
-  if (!auth) return { connector: "zoom", state: "unconfigured" };
-
-  const userId =
-    auth.mode === "server-to-server"
-      ? process.env.ZOOM_USER_ID?.trim()
-      : "me";
-
-  if (!userId) {
+  if (proc.error) {
     return {
-      connector: "zoom",
-      state: "unconfigured",
-      error: "ZOOM_USER_ID is required for server-to-server verification.",
+      connector,
+      state: "failed",
+      error: proc.error.message,
     };
   }
 
-  const result = await getJson(
-    `https://api.zoom.us/v2/users/${encodeURIComponent(userId)}/meetings?type=previous_meetings&page_size=1`,
-    {
-      Authorization: `Bearer ${auth.token}`,
-      Accept: "application/json",
-      "User-Agent": "nexus-kit-openclaw",
-    },
-  );
-
-  return {
-    connector: "zoom",
-    state: result.ok ? "read-verified" : "failed",
-    checks: [
-      {
-        endpoint: "previous meetings",
-        ok: result.ok,
-        status: result.status,
-      },
-    ],
-  };
-}
-
-async function probeLinear() {
-  const apiKey = process.env.LINEAR_API_KEY;
-  const accessToken = process.env.LINEAR_ACCESS_TOKEN;
-  if (!apiKey && !accessToken) {
-    return { connector: "linear", state: "unconfigured" };
+  const stdout = proc.stdout?.trim() || "";
+  let payload;
+  try {
+    payload = stdout ? JSON.parse(stdout) : {};
+  } catch {
+    return {
+      connector,
+      state: "failed",
+      error: "OpenClaw gateway call returned non-JSON output.",
+      exitCode: proc.status,
+    };
   }
 
-  const response = await fetch("https://api.linear.app/graphql", {
-    method: "POST",
-    headers: {
-      Authorization: accessToken ? `Bearer ${accessToken}` : apiKey,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      "User-Agent": "nexus-kit-openclaw",
-    },
-    body: JSON.stringify({
-      query: "query NexusKitViewer { viewer { id name email } }",
-    }),
-    redirect: "error",
-  });
+  if (proc.status !== 0) {
+    return {
+      connector,
+      state: looksUnconfigured(payload) ? "unconfigured" : "failed",
+      exitCode: proc.status,
+      error: findField(payload, "message") ?? "Gateway tool invocation failed.",
+    };
+  }
 
-  const body = await response.json().catch(() => ({}));
-  const graphqlErrors = Array.isArray(body?.errors) ? body.errors : [];
-  const ok = response.ok && graphqlErrors.length === 0 && Boolean(body?.data?.viewer?.id);
+  const readVerified = findField(payload, "readVerified");
+  const checks = findField(payload, "checks");
+  const phase = findField(payload, "phase");
+  const error = findField(payload, "error");
 
-  return {
-    connector: "linear",
-    state: ok ? "read-verified" : "failed",
-    checks: [
-      {
-        endpoint: "GraphQL viewer",
-        ok,
-        status: response.status,
-        graphqlErrorCount: graphqlErrors.length,
-      },
-    ],
-  };
-}
+  if (readVerified === true) {
+    return {
+      connector,
+      state: "read-verified",
+      ...(checks !== undefined ? { checks } : {}),
+    };
+  }
 
-async function probeNotion() {
-  const token = process.env.NOTION_TOKEN || process.env.NOTION_ACCESS_TOKEN;
-  if (!token) return { connector: "notion", state: "unconfigured" };
-
-  const result = await getJson("https://api.notion.com/v1/users/me", {
-    Authorization: `Bearer ${token}`,
-    "Notion-Version": process.env.NOTION_VERSION?.trim() || "2026-03-11",
-    Accept: "application/json",
-    "User-Agent": "nexus-kit-openclaw",
-  });
-
-  return {
-    connector: "notion",
-    state: result.ok ? "read-verified" : "failed",
-    checks: [{ endpoint: "/v1/users/me", ok: result.ok, status: result.status }],
-  };
-}
-
-async function probeDropbox() {
-  const token = await dropboxToken();
-  if (!token) return { connector: "dropbox", state: "unconfigured" };
-
-  const response = await fetch("https://api.dropboxapi.com/2/users/get_current_account", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      "User-Agent": "nexus-kit-openclaw",
-    },
-    body: "{}",
-    redirect: "error",
-  });
-
-  return {
-    connector: "dropbox",
-    state: response.ok ? "read-verified" : "failed",
-    checks: [
-      {
-        endpoint: "/2/users/get_current_account",
-        ok: response.ok,
-        status: response.status,
-      },
-    ],
-  };
-}
-
-async function probeMicrosoft() {
-  const token = await microsoftToken();
-  if (!token) return { connector: "microsoft-graph", state: "unconfigured" };
-
-  const headers = {
-    Authorization: `Bearer ${token}`,
-    Accept: "application/json",
-    "User-Agent": "nexus-kit-openclaw",
-  };
-
-  const endpoints = [
-    [
-      "graph-identity",
-      "https://graph.microsoft.com/v1.0/me?$select=id,displayName,userPrincipalName,mail",
-    ],
-    [
-      "outlook-mail",
-      "https://graph.microsoft.com/v1.0/me/mailFolders/inbox?$select=id,displayName,totalItemCount,unreadItemCount",
-    ],
-    [
-      "outlook-calendar",
-      "https://graph.microsoft.com/v1.0/me/calendars?$top=1&$select=id,name",
-    ],
-  ];
-
-  const checks = [];
-  for (const [name, url] of endpoints) {
-    const result = await getJson(url, headers);
-    checks.push({ endpoint: name, ok: result.ok, status: result.status });
+  if (readVerified === false) {
+    return {
+      connector,
+      state: looksUnconfigured(payload) ? "unconfigured" : "failed",
+      ...(phase !== undefined ? { phase } : {}),
+      ...(error !== undefined ? { error } : {}),
+      ...(checks !== undefined ? { checks } : {}),
+    };
   }
 
   return {
-    connector: "microsoft-graph",
-    state: checks.every((check) => check.ok) ? "read-verified" : "failed",
-    checks,
+    connector,
+    state: "failed",
+    error: "Connector probe returned no readVerified result.",
   };
 }
 
-const probes = {
-  github: probeGithub,
-  digitalocean: probeDigitalOcean,
-  gmail: () => probeGoogle("gmail"),
-  "google-calendar": () => probeGoogle("google-calendar"),
-  "google-drive": () => probeGoogle("google-drive"),
-  "google-contacts": () => probeGoogle("google-contacts"),
-  "microsoft-graph": probeMicrosoft,
-  dropbox: probeDropbox,
-  notion: probeNotion,
-  linear: probeLinear,
-  zoom: probeZoom,
-  figma: probeFigma,
-  canva: probeCanva,
-  "adobe-photoshop": probeAdobePhotoshop,
-};
-
-const selected = target === "all" ? Object.keys(probes) : [target];
+const selected = target === "all" ? PROBES : [target];
 
 let failures = 0;
-for (const name of selected) {
-  const probe = probes[name];
-  if (!probe) {
-    out({ connector: name, state: "unknown-connector" });
+for (const connector of selected) {
+  if (!PROBES.includes(connector)) {
+    out({ connector, state: "unknown-connector" });
     failures += 1;
     continue;
   }
 
-  try {
-    const result = await probe();
-    out(result);
-    if (result.state === "failed") failures += 1;
-  } catch (error) {
-    out({
-      connector: name,
-      state: "failed",
-      error: error instanceof Error ? error.message : String(error),
-    });
+  const result = invokeProbe(connector);
+  out(result);
+  if (result.state === "failed" || result.state === "unknown-connector") {
     failures += 1;
   }
 }
