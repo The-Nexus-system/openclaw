@@ -1,9 +1,43 @@
 #!/usr/bin/env node
 
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
 const target = (process.argv[2] || "all").toLowerCase();
 
 function out(record) {
   process.stdout.write(JSON.stringify(record) + "\n");
+}
+
+function secretStateDir() {
+  return (
+    process.env.NEXUS_KIT_SECRET_STATE_DIR?.trim() ||
+    path.join(os.homedir(), ".openclaw", "kit", "secrets")
+  );
+}
+
+function readSecretState(name) {
+  try {
+    return JSON.parse(
+      fs.readFileSync(path.join(secretStateDir(), `${name}.json`), "utf8"),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function writeSecretState(name, value) {
+  const dir = secretStateDir();
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const file = path.join(dir, `${name}.json`);
+  const temp = `${file}.tmp`;
+  fs.writeFileSync(temp, JSON.stringify(value, null, 2) + "\n", {
+    encoding: "utf8",
+    mode: 0o600,
+  });
+  fs.chmodSync(temp, 0o600);
+  fs.renameSync(temp, file);
 }
 
 async function getJson(url, headers) {
@@ -16,6 +50,52 @@ async function getJson(url, headers) {
     // Keep non-JSON text.
   }
   return { ok: response.ok, status: response.status, body };
+}
+
+async function canvaToken() {
+  if (process.env.CANVA_ACCESS_TOKEN) return process.env.CANVA_ACCESS_TOKEN;
+
+  const clientId = process.env.CANVA_CLIENT_ID;
+  const clientSecret = process.env.CANVA_CLIENT_SECRET;
+  const stored = readSecretState("canva");
+  const refreshToken =
+    (typeof stored.refresh_token === "string" ? stored.refresh_token : undefined) ||
+    process.env.CANVA_REFRESH_TOKEN;
+
+  if (!clientId || !clientSecret || !refreshToken) return null;
+
+  const basic = Buffer.from(`${clientId}:${clientSecret}`, "utf8").toString("base64");
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+  });
+
+  const response = await fetch("https://api.canva.com/rest/v1/oauth/token", {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${basic}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: body.toString(),
+    redirect: "error",
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.access_token) {
+    throw new Error(
+      data.error_description || data.error || `Canva OAuth HTTP ${response.status}`,
+    );
+  }
+
+  if (data.refresh_token) {
+    writeSecretState("canva", {
+      refresh_token: data.refresh_token,
+      updated_at: new Date().toISOString(),
+      scope: data.scope || null,
+    });
+  }
+
+  return data.access_token;
 }
 
 async function googleToken() {
@@ -248,6 +328,29 @@ async function probeGoogle(kind) {
   };
 }
 
+async function probeCanva() {
+  const token = await canvaToken();
+  if (!token) return { connector: "canva", state: "unconfigured" };
+
+  const result = await getJson("https://api.canva.com/rest/v1/users/me", {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/json",
+    "User-Agent": "nexus-kit-openclaw",
+  });
+
+  return {
+    connector: "canva",
+    state: result.ok ? "read-verified" : "failed",
+    checks: [
+      {
+        endpoint: "/rest/v1/users/me",
+        ok: result.ok,
+        status: result.status,
+      },
+    ],
+  };
+}
+
 async function probeFigma() {
   const personalToken = process.env.FIGMA_TOKEN;
   const oauthToken = process.env.FIGMA_ACCESS_TOKEN;
@@ -446,6 +549,7 @@ const probes = {
   linear: probeLinear,
   zoom: probeZoom,
   figma: probeFigma,
+  canva: probeCanva,
 };
 
 const selected = target === "all" ? Object.keys(probes) : [target];
