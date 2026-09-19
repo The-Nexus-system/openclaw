@@ -30,7 +30,10 @@ type PendingGoogleAuth = {
 };
 
 function stateDir(): string {
-  return path.join(os.homedir(), ".openclaw", "kit", "oauth");
+  return (
+    process.env.NEXUS_KIT_OAUTH_STATE_DIR?.trim() ||
+    path.join(os.homedir(), ".openclaw", "kit", "oauth")
+  );
 }
 
 function pendingFile(): string {
