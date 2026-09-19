@@ -1,0 +1,46 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import os
+import shutil
+import sys
+
+from nexus_kit_secret_store import get
+
+
+def main() -> None:
+    token = get("METRICOOL_USER_TOKEN")
+    user_id = get("METRICOOL_USER_ID")
+
+    missing = [
+        name
+        for name, value in [
+            ("METRICOOL_USER_TOKEN", token),
+            ("METRICOOL_USER_ID", user_id),
+        ]
+        if not value
+    ]
+    if missing:
+        raise SystemExit(
+            "Metricool MCP is not configured. Missing: " + ", ".join(missing)
+        )
+
+    uvx = shutil.which("uvx")
+    if not uvx:
+        raise SystemExit(
+            "Metricool MCP requires uvx on the OpenClaw host. Install uv/uvx first."
+        )
+
+    env = os.environ.copy()
+    env["METRICOOL_USER_TOKEN"] = str(token)
+    env["METRICOOL_USER_ID"] = str(user_id)
+
+    os.execve(
+        uvx,
+        [uvx, "mcp-metricool"],
+        env,
+    )
+
+
+if __name__ == "__main__":
+    main()
