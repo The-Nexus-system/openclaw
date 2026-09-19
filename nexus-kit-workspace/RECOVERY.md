@@ -14,3 +14,22 @@ Goal: recover the Kit OpenClaw environment after loss of a host, provider, or mo
 Hosted model weights are not stored here. If a backend changes, rerun capability and behavior transfer tests and document material differences.
 
 Recovery is complete only when the runtime can retrieve continuity, apply the operating loop, use required tools, verify actions, and resume a known handoff.
+
+
+## Contact channels
+
+After the runtime and external connectors recover, restore the private contact paths.
+
+Telegram:
+- restore the bot token through OpenClaw SecretRef;
+- restore private allowlisted owner user IDs;
+- verify channel status and Telegram capabilities;
+- complete a real inbound/outbound DM round-trip.
+
+WhatsApp:
+- restore or relink the private Baileys session;
+- restore private allowlisted Nexus phone numbers;
+- verify the gateway listener is live;
+- complete a real inbound/outbound WhatsApp round-trip.
+
+Recovery is not considered complete if Kit can run tools but cannot reach the authorized Nexus contact channels.
