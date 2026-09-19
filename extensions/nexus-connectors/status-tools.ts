@@ -1,5 +1,6 @@
 import { Type } from "@sinclair/typebox";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/plugin-entry";
+import { hasConnectorSecret, connectorSecretSource, getConnectorSecret } from "./connector-secrets.js";
 import type { ConnectorRegistry } from "./shared.js";
 import {
   resolveRegistryPath,
@@ -71,14 +72,14 @@ export function registerStatusTools(api: OpenClawPluginApi) {
             const alternatives = item.credentialAlternatives ?? [];
             const optionalMarkers = item.optionalCredentialEnv ?? [];
             const credentialMarkers = Object.fromEntries(
-              markers.map((name) => [name, Boolean(process.env[name])]),
+              markers.map((name) => [name, hasConnectorSecret(name)]),
             );
             const alternativeStatus = alternatives.map((group) => ({
-              markers: Object.fromEntries(group.map((name) => [name, Boolean(process.env[name])])),
-              satisfied: group.every((name) => Boolean(process.env[name])),
+              markers: Object.fromEntries(group.map((name) => [name, hasConnectorSecret(name)])),
+              satisfied: group.every((name) => hasConnectorSecret(name)),
             }));
             const optionalCredentialMarkers = Object.fromEntries(
-              optionalMarkers.map((name) => [name, Boolean(process.env[name])]),
+              optionalMarkers.map((name) => [name, hasConnectorSecret(name)]),
             );
 
             return {
@@ -89,6 +90,9 @@ export function registerStatusTools(api: OpenClawPluginApi) {
               routes: item.routes ?? [],
               targetCapabilities: item.targetCapabilities ?? [],
               credentialMarkers,
+              credentialSources: Object.fromEntries(
+                markers.map((name) => [name, connectorSecretSource(name)]),
+              ),
               credentialAlternatives: alternativeStatus,
               optionalCredentialMarkers,
               requiredReadScopes: item.requiredReadScopes ?? [],
@@ -147,7 +151,7 @@ export function registerStatusTools(api: OpenClawPluginApi) {
         try {
 
           if (params.connector === "github") {
-            const token = process.env.GITHUB_TOKEN;
+            const token = getConnectorSecret("GITHUB_TOKEN");
             if (!token) {
               throw new Error("GITHUB_TOKEN is not configured on the OpenClaw host.");
             }
@@ -161,7 +165,7 @@ export function registerStatusTools(api: OpenClawPluginApi) {
           }
 
           if (params.connector === "digitalocean") {
-            const token = process.env.DIGITALOCEAN_ACCESS_TOKEN;
+            const token = getConnectorSecret("DIGITALOCEAN_ACCESS_TOKEN");
             if (!token) {
               throw new Error(
                 "DIGITALOCEAN_ACCESS_TOKEN is not configured on the OpenClaw host.",
