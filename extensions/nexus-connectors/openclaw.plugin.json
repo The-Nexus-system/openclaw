@@ -1,0 +1,14 @@
+{
+  "id": "nexus-connectors",
+  "name": "Nexus Connectors",
+  "description": "Portable connector readiness and routing for the Nexus Kit gateway",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "registryPath": {
+        "type": "string"
+      }
+    }
+  }
+}
