@@ -444,6 +444,22 @@ function zoomTargetUser(mode: "direct" | "refresh" | "server-to-server", explici
   }
   return "me";
 }
+function figmaHeaders(): Record<string, string> {
+  const personalToken = process.env.FIGMA_TOKEN;
+  const oauthToken = process.env.FIGMA_ACCESS_TOKEN;
+
+  if (!personalToken && !oauthToken) {
+    throw new Error("FIGMA_TOKEN or FIGMA_ACCESS_TOKEN must be configured on the OpenClaw host.");
+  }
+
+  return {
+    ...(oauthToken
+      ? { Authorization: `Bearer ${oauthToken}` }
+      : { "X-Figma-Token": personalToken! }),
+    Accept: "application/json",
+    "User-Agent": "nexus-kit-openclaw",
+  };
+}
 
 export default definePluginEntry({
   id: "nexus-connectors",
@@ -565,6 +581,7 @@ export default definePluginEntry({
           Type.Literal("notion"),
           Type.Literal("linear"),
           Type.Literal("zoom"),
+          Type.Literal("figma"),
         ]),
       }),
       async execute(_id, params) {
@@ -644,6 +661,14 @@ export default definePluginEntry({
               );
               checks.push({ name: "people-me", ok: result.ok, status: result.status });
             }
+          }
+
+          if (params.connector === "figma") {
+            const result = await providerGet(
+              "https://api.figma.com/v1/me",
+              figmaHeaders(),
+            );
+            checks.push({ name: "figma-me", ok: result.ok, status: result.status });
           }
 
           if (params.connector === "zoom") {
@@ -862,6 +887,56 @@ export default definePluginEntry({
       },
     });
 
+
+    api.registerTool({
+      name: "nexus_figma_read",
+      description:
+        "Read Figma through an independently authenticated OpenClaw route. Supports user identity, file content, file metadata, and comments without using a ChatGPT connector.",
+      parameters: Type.Object({
+        operation: Type.Union([
+          Type.Literal("me"),
+          Type.Literal("file"),
+          Type.Literal("file_metadata"),
+          Type.Literal("comments"),
+        ]),
+        fileKey: Type.Optional(Type.String()),
+        depth: Type.Optional(Type.Integer({ minimum: 1, maximum: 20 })),
+      }),
+      async execute(_id, params) {
+        try {
+          const headers = figmaHeaders();
+
+          if (params.operation === "me") {
+            const result = await providerGet("https://api.figma.com/v1/me", headers);
+            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+          }
+
+          const fileKey = params.fileKey?.trim();
+          if (!fileKey) throw new Error("fileKey is required for this Figma operation");
+
+          let url: string;
+          if (params.operation === "file") {
+            const query = new URLSearchParams();
+            if (params.depth) query.set("depth", String(params.depth));
+            url =
+              `https://api.figma.com/v1/files/${encodeURIComponent(fileKey)}` +
+              (query.size ? `?${query.toString()}` : "");
+          } else if (params.operation === "file_metadata") {
+            url = `https://api.figma.com/v1/files/${encodeURIComponent(fileKey)}/meta`;
+          } else {
+            url = `https://api.figma.com/v1/files/${encodeURIComponent(fileKey)}/comments`;
+          }
+
+          const result = await providerGet(url, headers);
+          return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return {
+            content: [{ type: "text", text: JSON.stringify({ ok: false, error: message }) }],
+          };
+        }
+      },
+    });
 
     api.registerTool({
       name: "nexus_zoom_read",
