@@ -3,49 +3,85 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import os
+from pathlib import Path
+import shutil
+import subprocess
 
 from nexus_kit_secret_store import get, set_secret
+
+MCP_REMOTE_VERSION = "0.1.38"
+METRICOOL_MCP_URL = "https://ai.metricool.com/mcp"
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Configure Metricool's official MCP without storing a Metricool password."
+        description="Authorize Metricool's official MCP without storing a Metricool password."
     )
-    parser.add_argument("--user-id")
+    parser.add_argument(
+        "--api-key",
+        action="store_true",
+        help="Use a Metricool API key/header instead of OAuth device authorization.",
+    )
     args = parser.parse_args()
 
-    print("Metricool MCP authorization")
-    print("This route stores the Metricool user token and user ID, not your Metricool password.")
+    state_dir = Path.home() / ".openclaw" / "kit" / "mcp-auth" / "metricool"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    if os.name != "nt":
+        os.chmod(state_dir, 0o700)
+
+    if args.api_key:
+        if get("METRICOOL_API_KEY"):
+            print("Metricool API key: already stored.")
+            return
+
+        value = getpass.getpass("Metricool API key: ")
+        if not value:
+            raise SystemExit("Metricool API key was empty; nothing changed.")
+        verify = getpass.getpass("Re-enter Metricool API key: ")
+        if value != verify:
+            raise SystemExit("Metricool API key values did not match; nothing changed.")
+        set_secret("METRICOOL_API_KEY", value)
+        print("Metricool API key stored in the protected connector vault.")
+        return
+
+    npx = shutil.which("npx")
+    if not npx:
+        raise SystemExit("Metricool OAuth setup requires Node.js/npx on the host.")
+
+    env = os.environ.copy()
+    env["MCP_REMOTE_CONFIG_DIR"] = str(state_dir)
+
+    print("Metricool OAuth device authorization")
+    print("If Metricool advertises device authorization, a short URL/code will appear below.")
+    print("Open it on your phone, approve access, and this command will verify the MCP connection.")
     print()
 
-    user_id = (args.user_id or "").strip()
-    if not user_id:
-        existing = get("METRICOOL_USER_ID")
-        if existing:
-            print("Metricool user ID: already stored.")
-            user_id = existing
-        else:
-            user_id = input("Metricool user ID: ").strip()
-            if not user_id:
-                raise SystemExit("Metricool user ID was empty; nothing changed.")
-            set_secret("METRICOOL_USER_ID", user_id)
-    else:
-        set_secret("METRICOOL_USER_ID", user_id)
+    completed = subprocess.run(
+        [
+            npx,
+            "-y",
+            "-p",
+            f"mcp-remote@{MCP_REMOTE_VERSION}",
+            "mcp-remote-client",
+            METRICOOL_MCP_URL,
+            "--device-code",
+            "--transport",
+            "http-first",
+        ],
+        env=env,
+        check=False,
+    )
 
-    if get("METRICOOL_USER_TOKEN"):
-        print("Metricool user token: already stored.")
-    else:
-        token = getpass.getpass("Metricool user token: ")
-        if not token:
-            raise SystemExit("Metricool user token was empty; nothing changed.")
-        confirm = getpass.getpass("Re-enter Metricool user token: ")
-        if token != confirm:
-            raise SystemExit("Metricool token values did not match; nothing changed.")
-        set_secret("METRICOOL_USER_TOKEN", token)
-        print("Metricool user token stored in the protected connector vault.")
+    if completed.returncode != 0:
+        raise SystemExit(
+            "Metricool device authorization did not complete. "
+            "Do not treat Metricool as verified. If the account exposes an API key, "
+            "run nexus-kit-auth metricool --api-key; otherwise we need a different OAuth callback route."
+        )
 
     print()
-    print("Metricool credential setup is ready for the live MCP health probe.")
+    print("Metricool MCP authentication completed and the remote server responded.")
 
 
 if __name__ == "__main__":
