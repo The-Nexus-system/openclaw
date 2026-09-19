@@ -179,16 +179,23 @@
         "official-api",
         "openclaw-plugin"
       ],
-      "credentialEnv": [
-        "DROPBOX_APP_KEY",
-        "DROPBOX_APP_SECRET"
-      ],
+      "credentialEnv": [],
       "targetCapabilities": [
         "files.search",
         "files.read",
         "files.write"
       ],
-      "state": "planned"
+      "state": "planned",
+      "credentialAlternatives": [
+        [
+          "DROPBOX_ACCESS_TOKEN"
+        ],
+        [
+          "DROPBOX_APP_KEY",
+          "DROPBOX_APP_SECRET",
+          "DROPBOX_REFRESH_TOKEN"
+        ]
+      ]
     },
     {
       "id": "notion",
