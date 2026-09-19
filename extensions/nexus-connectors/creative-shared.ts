@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { ConnectorProbeError } from "./shared.js";
 
 export function figmaHeaders(): Record<string, string> {
@@ -78,6 +81,104 @@ export function adobePhotoshopHeaders(token: string): Record<string, string> {
     Authorization: `Bearer ${token}`,
     "x-api-key": clientId,
     Accept: "application/json, text/plain;q=0.9",
+    "User-Agent": "nexus-kit-openclaw",
+  };
+}
+
+function creativeSecretStateDir(): string {
+  return (
+    process.env.NEXUS_KIT_SECRET_STATE_DIR?.trim() ||
+    path.join(os.homedir(), ".openclaw", "kit", "secrets")
+  );
+}
+
+function readCreativeSecretState(name: string): Record<string, unknown> {
+  const file = path.join(creativeSecretStateDir(), `${name}.json`);
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8")) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+function writeCreativeSecretState(name: string, value: Record<string, unknown>): void {
+  const dir = creativeSecretStateDir();
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const file = path.join(dir, `${name}.json`);
+  const temp = `${file}.tmp`;
+  fs.writeFileSync(temp, JSON.stringify(value, null, 2) + "\n", {
+    encoding: "utf8",
+    mode: 0o600,
+  });
+  fs.chmodSync(temp, 0o600);
+  fs.renameSync(temp, file);
+}
+
+export async function getCanvaAccessToken(): Promise<string> {
+  const direct = process.env.CANVA_ACCESS_TOKEN;
+  if (direct) return direct;
+
+  const clientId = process.env.CANVA_CLIENT_ID;
+  const clientSecret = process.env.CANVA_CLIENT_SECRET;
+  const stored = readCreativeSecretState("canva");
+  const refreshToken =
+    (typeof stored.refresh_token === "string" ? stored.refresh_token : undefined) ||
+    process.env.CANVA_REFRESH_TOKEN;
+
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new ConnectorProbeError(
+      "credentials",
+      "Configure CANVA_ACCESS_TOKEN or CANVA_CLIENT_ID, CANVA_CLIENT_SECRET, and CANVA_REFRESH_TOKEN on the OpenClaw host.",
+    );
+  }
+
+  const basic = Buffer.from(`${clientId}:${clientSecret}`, "utf8").toString("base64");
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+  });
+
+  const response = await fetch("https://api.canva.com/rest/v1/oauth/token", {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${basic}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: body.toString(),
+    redirect: "error",
+  });
+
+  const data = (await response.json().catch(() => ({}))) as {
+    access_token?: string;
+    refresh_token?: string;
+    expires_in?: number;
+    scope?: string;
+    error?: string;
+    error_description?: string;
+  };
+
+  if (!response.ok || !data.access_token) {
+    throw new ConnectorProbeError(
+      "token-refresh",
+      data.error_description ?? data.error ?? `Canva OAuth HTTP ${response.status}`,
+    );
+  }
+
+  if (data.refresh_token) {
+    writeCreativeSecretState("canva", {
+      refresh_token: data.refresh_token,
+      updated_at: new Date().toISOString(),
+      scope: data.scope ?? null,
+    });
+  }
+
+  return data.access_token;
+}
+
+export function canvaHeaders(token: string): Record<string, string> {
+  return {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/json",
     "User-Agent": "nexus-kit-openclaw",
   };
 }
