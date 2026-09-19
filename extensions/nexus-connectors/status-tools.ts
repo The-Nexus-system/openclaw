@@ -12,6 +12,7 @@ import {
   linearGraphql,
   getZoomAccessToken,
   zoomTargetUser,
+  figmaHeaders,
 } from "./shared.js";
 
 export function registerStatusTools(api: OpenClawPluginApi) {
@@ -129,6 +130,7 @@ export function registerStatusTools(api: OpenClawPluginApi) {
           Type.Literal("notion"),
           Type.Literal("linear"),
           Type.Literal("zoom"),
+          Type.Literal("figma"),
         ]),
       }),
       async execute(_id, params) {
@@ -208,6 +210,14 @@ export function registerStatusTools(api: OpenClawPluginApi) {
               );
               checks.push({ name: "people-me", ok: result.ok, status: result.status });
             }
+          }
+
+          if (params.connector === "figma") {
+            const result = await providerGet(
+              "https://api.figma.com/v1/me",
+              figmaHeaders(),
+            );
+            checks.push({ name: "figma-me", ok: result.ok, status: result.status });
           }
 
           if (params.connector === "zoom") {
