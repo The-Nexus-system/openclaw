@@ -101,6 +101,16 @@ Tool: `nexus_figma_read`
 
 The live probe reaches `/v1/me`. Personal access tokens and OAuth bearer tokens are supported.
 
+### Canva
+
+Independent OAuth refresh, rotating refresh-token persistence, live identity verification, and read routing are implemented.
+
+Tool: `nexus_canva_read`
+
+The read tool supports current-user identity/profile, design listing, and single-design metadata. The live probe reaches `/rest/v1/users/me`, which requires a valid user token but no additional scope.
+
+Because Canva refresh tokens are one-use, refreshed tokens are rotated into private host state at `~/.openclaw/kit/secrets/canva.json` rather than committed to Git. Runtime state remains unverified until an independently authorized Canva grant is installed and the live probe succeeds.
+
 ### Adobe Photoshop / Firefly Services
 
 Independent authentication and health verification are implemented for Photoshop / Firefly Services.
@@ -113,7 +123,6 @@ This proves Photoshop-service access only. Creative write/image-job parity is no
 
 Core providers still needing independent adapters or deeper write parity include:
 
-- Canva
 - Spotify
 - Apple Music
 - Adobe PDF Services
