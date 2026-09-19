@@ -59,7 +59,6 @@ ln -sf "$REPO_ROOT/scripts/nexus-kit-secret" "$BIN_DIR/nexus-kit-secret"
 ln -sf "$REPO_ROOT/scripts/nexus-kit-contact-health.sh" "$BIN_DIR/nexus-kit-contact-health"
 ln -sf "$REPO_ROOT/scripts/nexus-kit-mcp-metricool" "$BIN_DIR/nexus-kit-mcp-metricool"
 
-openclaw mcp set metricool "{\"command\":\"$BIN_DIR/nexus-kit-mcp-metricool\"}" >/dev/null
 cp "$CLAWTEAM_DIR/skills/openclaw/SKILL.md" "$CLAWTEAM_SKILL_DIR/SKILL.md"
 cp "$REPO_ROOT/skills/nexus-connectors/SKILL.md" "$CONNECTOR_SKILL_DIR/SKILL.md"
 
@@ -72,6 +71,8 @@ if ! command -v openclaw >/dev/null 2>&1; then
   echo "OpenClaw executable not found; cannot verify the Kit gateway." >&2
   exit 1
 fi
+
+openclaw mcp set metricool "{\"command\":\"$BIN_DIR/nexus-kit-mcp-metricool\"}" >/dev/null
 
 openclaw approvals allowlist add --agent "*" "*/clawteam" >/dev/null 2>&1 || true
 
