@@ -16,16 +16,16 @@ export function registerDeveloperTools(api: OpenClawPluginApi) {
     }),
     async execute(_id, params) {
       try {
+        if (params.operation === "model" && !params.model?.trim()) {
+          throw new Error("model is required for model retrieval");
+        }
+
         const result =
           params.operation === "models"
             ? await openAIGet("/models")
             : await openAIGet(
-                `/models/${encodeURIComponent(params.model?.trim() || "")}`,
+                `/models/${encodeURIComponent(params.model!.trim())}`,
               );
-
-        if (params.operation === "model" && !params.model?.trim()) {
-          throw new Error("model is required for model retrieval");
-        }
 
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
