@@ -565,3 +565,79 @@ export async function runExpoProjectRead(
     );
   }
 }
+
+
+export async function getSpotifyAccessToken(): Promise<string> {
+  const clientId = getConnectorSecret("SPOTIFY_CLIENT_ID");
+  const clientSecret = getConnectorSecret("SPOTIFY_CLIENT_SECRET");
+  const refreshToken = getConnectorSecret("SPOTIFY_REFRESH_TOKEN");
+
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new ConnectorProbeError(
+      "credentials",
+      "SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, and SPOTIFY_REFRESH_TOKEN must be configured.",
+    );
+  }
+
+  const basic = Buffer.from(`${clientId}:${clientSecret}`, "utf8").toString("base64");
+  const form = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+  });
+
+  const response = await fetch("https://accounts.spotify.com/api/token", {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${basic}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+    },
+    body: form.toString(),
+    redirect: "error",
+  });
+
+  const text = await response.text();
+  let body: {
+    access_token?: string;
+    refresh_token?: string;
+    scope?: string;
+    error?: string;
+    error_description?: string;
+  } = {};
+  try {
+    body = text ? JSON.parse(text) : {};
+  } catch {
+    throw new ConnectorProbeError(
+      "token-refresh",
+      `Spotify token refresh returned non-JSON HTTP ${response.status}`,
+    );
+  }
+
+  if (!response.ok || !body.access_token) {
+    throw new ConnectorProbeError(
+      "token-refresh",
+      body.error_description ??
+        body.error ??
+        `Spotify token refresh failed with HTTP ${response.status}`,
+    );
+  }
+
+  if (body.refresh_token) {
+    setConnectorSecret("SPOTIFY_REFRESH_TOKEN", body.refresh_token);
+  }
+  if (body.scope) {
+    setConnectorSecret("SPOTIFY_GRANTED_SCOPES", body.scope);
+  }
+
+  return body.access_token;
+}
+
+export async function spotifyGet(relativePath: string) {
+  const token = await getSpotifyAccessToken();
+  const apiPath = relativePath.startsWith("/") ? relativePath : `/${relativePath}`;
+  return providerGet(`https://api.spotify.com/v1${apiPath}`, {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/json",
+    "User-Agent": "nexus-kit-openclaw",
+  });
+}
