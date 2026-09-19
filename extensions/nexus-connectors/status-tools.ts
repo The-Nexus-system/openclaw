@@ -17,6 +17,10 @@ import {
   runExpoProjectRead,
 } from "./shared.js";
 import {
+  metaDeveloperAppRead,
+  openAIGet,
+} from "./developer-shared.js";
+import {
   facebookManagedPages,
   instagramProfessionalIdentity,
   threadsIdentity,
@@ -157,6 +161,8 @@ export function registerStatusTools(api: OpenClawPluginApi) {
           Type.Literal("facebook-pages"),
           Type.Literal("instagram"),
           Type.Literal("threads"),
+          Type.Literal("openai-api"),
+          Type.Literal("meta-developer"),
         ]),
       }),
       async execute(_id, params) {
@@ -394,6 +400,28 @@ export function registerStatusTools(api: OpenClawPluginApi) {
               throw new ConnectorProbeError(
                 "threads",
                 `Threads profile probe failed with HTTP ${result.status}`,
+              );
+            }
+          }
+
+          if (params.connector === "openai-api") {
+            const result = await openAIGet("/models");
+            checks.push({ name: "openai-models", ok: result.ok, status: result.status });
+            if (!result.ok) {
+              throw new ConnectorProbeError(
+                "models",
+                `OpenAI models probe failed with HTTP ${result.status}`,
+              );
+            }
+          }
+
+          if (params.connector === "meta-developer") {
+            const result = await metaDeveloperAppRead();
+            checks.push({ name: "meta-developer-app", ok: result.ok, status: result.status });
+            if (!result.ok) {
+              throw new ConnectorProbeError(
+                "app",
+                `Meta developer app probe failed with HTTP ${result.status}`,
               );
             }
           }
