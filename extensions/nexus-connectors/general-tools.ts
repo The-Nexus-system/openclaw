@@ -9,8 +9,8 @@ import {
   linearGraphql,
   getZoomAccessToken,
   zoomTargetUser,
-  figmaHeaders,
 } from "./shared.js";
+import { figmaHeaders } from "./creative-shared.js";
 
 export function registerGeneralTools(api: OpenClawPluginApi) {
     api.registerTool({
