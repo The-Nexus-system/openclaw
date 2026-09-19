@@ -286,6 +286,170 @@ export default definePluginEntry({
       },
     });
 
+
+    api.registerTool({
+      name: "nexus_connector_probe",
+      description:
+        "Run a harmless live read against an independently configured external service and report whether OpenClaw actually reached the intended provider. This is the verification step used before calling a connector read-verified.",
+      parameters: Type.Object({
+        connector: Type.Union([
+          Type.Literal("github"),
+          Type.Literal("digitalocean"),
+          Type.Literal("gmail"),
+          Type.Literal("google-calendar"),
+          Type.Literal("google-drive"),
+          Type.Literal("google-contacts"),
+          Type.Literal("microsoft-graph"),
+        ]),
+      }),
+      async execute(_id, params) {
+        try {
+          const checks: Array<{ name: string; ok: boolean; status: number }> = [];
+
+          if (params.connector === "github") {
+            const token = process.env.GITHUB_TOKEN;
+            if (!token) {
+              throw new Error("GITHUB_TOKEN is not configured on the OpenClaw host.");
+            }
+            const result = await providerGet("https://api.github.com/user", {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/vnd.github+json",
+              "X-GitHub-Api-Version": "2022-11-28",
+              "User-Agent": "nexus-kit-openclaw",
+            });
+            checks.push({ name: "authenticated-user", ok: result.ok, status: result.status });
+          }
+
+          if (params.connector === "digitalocean") {
+            const token = process.env.DIGITALOCEAN_ACCESS_TOKEN;
+            if (!token) {
+              throw new Error(
+                "DIGITALOCEAN_ACCESS_TOKEN is not configured on the OpenClaw host.",
+              );
+            }
+            const result = await providerGet("https://api.digitalocean.com/v2/account", {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+              "User-Agent": "nexus-kit-openclaw",
+            });
+            checks.push({ name: "account", ok: result.ok, status: result.status });
+          }
+
+          if (
+            params.connector === "gmail" ||
+            params.connector === "google-calendar" ||
+            params.connector === "google-drive" ||
+            params.connector === "google-contacts"
+          ) {
+            const token = await getGoogleAccessToken();
+            const headers = {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+              "User-Agent": "nexus-kit-openclaw",
+            };
+
+            if (params.connector === "gmail") {
+              const result = await providerGet(
+                "https://gmail.googleapis.com/gmail/v1/users/me/profile",
+                headers,
+              );
+              checks.push({ name: "gmail-profile", ok: result.ok, status: result.status });
+            }
+
+            if (params.connector === "google-calendar") {
+              const result = await providerGet(
+                "https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=1",
+                headers,
+              );
+              checks.push({ name: "calendar-list", ok: result.ok, status: result.status });
+            }
+
+            if (params.connector === "google-drive") {
+              const result = await providerGet(
+                "https://www.googleapis.com/drive/v3/files?pageSize=1&fields=files(id,name)",
+                headers,
+              );
+              checks.push({ name: "drive-files", ok: result.ok, status: result.status });
+            }
+
+            if (params.connector === "google-contacts") {
+              const result = await providerGet(
+                "https://people.googleapis.com/v1/people/me?personFields=names,emailAddresses",
+                headers,
+              );
+              checks.push({ name: "people-me", ok: result.ok, status: result.status });
+            }
+          }
+
+          if (params.connector === "microsoft-graph") {
+            const token = await getMicrosoftAccessToken();
+            const headers = {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+              "User-Agent": "nexus-kit-openclaw",
+            };
+
+            const identity = await providerGet(
+              "https://graph.microsoft.com/v1.0/me?$select=id,displayName,userPrincipalName,mail",
+              headers,
+            );
+            checks.push({ name: "graph-identity", ok: identity.ok, status: identity.status });
+
+            const mail = await providerGet(
+              "https://graph.microsoft.com/v1.0/me/mailFolders/inbox?$select=id,displayName,totalItemCount,unreadItemCount",
+              headers,
+            );
+            checks.push({ name: "outlook-mail", ok: mail.ok, status: mail.status });
+
+            const calendar = await providerGet(
+              "https://graph.microsoft.com/v1.0/me/calendars?$top=1&$select=id,name",
+              headers,
+            );
+            checks.push({ name: "outlook-calendar", ok: calendar.ok, status: calendar.status });
+          }
+
+          const readVerified = checks.length > 0 && checks.every((check) => check.ok);
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  {
+                    connector: params.connector,
+                    readVerified,
+                    checks,
+                    note: readVerified
+                      ? "Independent OpenClaw provider access reached every required probe endpoint."
+                      : "At least one required live provider probe failed. Do not mark this connector read-verified.",
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  {
+                    connector: params.connector,
+                    readVerified: false,
+                    error: message,
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
+        }
+      },
+    });
+
     api.registerTool({
       name: "nexus_github_get",
       description:
