@@ -17,6 +17,13 @@ import {
   runExpoProjectRead,
 } from "./shared.js";
 import {
+  facebookManagedPages,
+  instagramProfessionalIdentity,
+  threadsIdentity,
+  twilioAccountSid,
+  twilioGet,
+} from "./social-shared.js";
+import {
   adobePhotoshopHeaders,
   canvaHeaders,
   figmaHeaders,
@@ -146,6 +153,10 @@ export function registerStatusTools(api: OpenClawPluginApi) {
           Type.Literal("canva"),
           Type.Literal("adobe-photoshop"),
           Type.Literal("expo-eas"),
+          Type.Literal("twilio"),
+          Type.Literal("facebook-pages"),
+          Type.Literal("instagram"),
+          Type.Literal("threads"),
         ]),
       }),
       async execute(_id, params) {
@@ -336,6 +347,53 @@ export function registerStatusTools(api: OpenClawPluginApi) {
               throw new ConnectorProbeError(
                 "project",
                 `Expo EAS project probe failed with status ${result.status}`,
+              );
+            }
+          }
+
+          if (params.connector === "twilio") {
+            const accountSid = twilioAccountSid();
+            const result = await twilioGet(
+              `/Accounts/${encodeURIComponent(accountSid)}.json`,
+            );
+            checks.push({ name: "twilio-account", ok: result.ok, status: result.status });
+            if (!result.ok) {
+              throw new ConnectorProbeError(
+                "account",
+                `Twilio account probe failed with HTTP ${result.status}`,
+              );
+            }
+          }
+
+          if (params.connector === "facebook-pages") {
+            const result = await facebookManagedPages(1);
+            checks.push({ name: "facebook-pages", ok: result.ok, status: result.status });
+            if (!result.ok) {
+              throw new ConnectorProbeError(
+                "pages",
+                `Facebook Pages probe failed with HTTP ${result.status}`,
+              );
+            }
+          }
+
+          if (params.connector === "instagram") {
+            const result = await instagramProfessionalIdentity(1);
+            checks.push({ name: "instagram-professional", ok: result.ok, status: result.status });
+            if (!result.ok) {
+              throw new ConnectorProbeError(
+                "instagram",
+                `Instagram professional account probe failed with HTTP ${result.status}`,
+              );
+            }
+          }
+
+          if (params.connector === "threads") {
+            const result = await threadsIdentity();
+            checks.push({ name: "threads-profile", ok: result.ok, status: result.status });
+            if (!result.ok) {
+              throw new ConnectorProbeError(
+                "threads",
+                `Threads profile probe failed with HTTP ${result.status}`,
               );
             }
           }
