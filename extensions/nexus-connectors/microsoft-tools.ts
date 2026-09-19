@@ -10,6 +10,7 @@ import {
 } from "./shared.js";
 
 export function registerMicrosoftTools(api: OpenClawPluginApi) {
+    api.registerTool({
       name: "nexus_microsoft_graph_get",
       description:
         "Perform an independently authenticated read-only GET against Microsoft Graph using OAuth credentials stored on the OpenClaw host. This is for Outlook mail/calendar and related Microsoft Graph reads and does not use a ChatGPT connector.",
@@ -284,5 +285,4 @@ export function registerMicrosoftTools(api: OpenClawPluginApi) {
       { optional: true },
     );
 
-    api.registerTool({
 }
