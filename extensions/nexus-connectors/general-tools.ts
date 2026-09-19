@@ -1,5 +1,6 @@
 import { Type } from "@sinclair/typebox";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/plugin-entry";
+import { getConnectorSecret } from "./connector-secrets.js";
 import {
   normalizeApiPath,
   providerGet,
@@ -23,7 +24,7 @@ export function registerGeneralTools(api: OpenClawPluginApi) {
         }),
       }),
       async execute(_id, params) {
-        const token = process.env.GITHUB_TOKEN;
+        const token = getConnectorSecret("GITHUB_TOKEN");
         if (!token) {
           return {
             content: [
@@ -66,7 +67,7 @@ export function registerGeneralTools(api: OpenClawPluginApi) {
         }),
       }),
       async execute(_id, params) {
-        const token = process.env.DIGITALOCEAN_ACCESS_TOKEN;
+        const token = getConnectorSecret("DIGITALOCEAN_ACCESS_TOKEN");
         if (!token) {
           return {
             content: [
