@@ -17,6 +17,9 @@ import {
   runExpoProjectRead,
 } from "./shared.js";
 import {
+  appStoreConnectGet,
+  googlePlayGet,
+  googlePlayPackageName,
   metaDeveloperAppRead,
   openAIGet,
 } from "./developer-shared.js";
@@ -163,6 +166,8 @@ export function registerStatusTools(api: OpenClawPluginApi) {
           Type.Literal("threads"),
           Type.Literal("openai-api"),
           Type.Literal("meta-developer"),
+          Type.Literal("app-store-connect"),
+          Type.Literal("google-play"),
         ]),
       }),
       async execute(_id, params) {
@@ -422,6 +427,31 @@ export function registerStatusTools(api: OpenClawPluginApi) {
               throw new ConnectorProbeError(
                 "app",
                 `Meta developer app probe failed with HTTP ${result.status}`,
+              );
+            }
+          }
+
+          if (params.connector === "app-store-connect") {
+            const result = await appStoreConnectGet("/apps?limit=1");
+            checks.push({ name: "app-store-connect-apps", ok: result.ok, status: result.status });
+            if (!result.ok) {
+              throw new ConnectorProbeError(
+                "apps",
+                `App Store Connect apps probe failed with HTTP ${result.status}`,
+              );
+            }
+          }
+
+          if (params.connector === "google-play") {
+            const packageName = googlePlayPackageName();
+            const result = await googlePlayGet(
+              `/applications/${encodeURIComponent(packageName)}/reviews?maxResults=1`,
+            );
+            checks.push({ name: "google-play-reviews", ok: result.ok, status: result.status });
+            if (!result.ok) {
+              throw new ConnectorProbeError(
+                "reviews",
+                `Google Play reviews probe failed with HTTP ${result.status}`,
               );
             }
           }
