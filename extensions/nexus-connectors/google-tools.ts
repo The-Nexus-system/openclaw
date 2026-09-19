@@ -10,6 +10,7 @@ import {
 } from "./shared.js";
 
 export function registerGoogleTools(api: OpenClawPluginApi) {
+    api.registerTool({
       name: "nexus_google_get",
       description:
         "Perform an independently authenticated read-only GET against Gmail, Google Calendar, Google Drive, or Google People using OAuth credentials on the OpenClaw host. This does not use a ChatGPT connector.",
