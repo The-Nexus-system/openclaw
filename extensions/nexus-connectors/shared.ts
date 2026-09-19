@@ -1,7 +1,11 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { getConnectorSecret } from "./connector-secrets.js";
+
+const execFileAsync = promisify(execFile);
 
 export type ConnectorRecord = {
   id: string;
@@ -461,3 +465,99 @@ export function zoomTargetUser(mode: "direct" | "refresh" | "server-to-server", 
   return "me";
 }
 
+
+
+export async function runExpoProjectRead(
+  operation: "info" | "status",
+  limit = 3,
+): Promise<{ ok: boolean; status: number; body: unknown }> {
+  const token = getConnectorSecret("EXPO_TOKEN");
+  if (!token) {
+    throw new ConnectorProbeError(
+      "credentials",
+      "EXPO_TOKEN must be configured in the protected OpenClaw connector store.",
+    );
+  }
+
+  const projectDir = getConnectorSecret("EXPO_PROJECT_DIR")?.trim();
+  if (!projectDir) {
+    throw new ConnectorProbeError(
+      "project",
+      "EXPO_PROJECT_DIR must point to a linked Expo/EAS project on the OpenClaw host.",
+    );
+  }
+
+  let stat: fs.Stats;
+  try {
+    stat = fs.statSync(projectDir);
+  } catch {
+    throw new ConnectorProbeError(
+      "project",
+      "EXPO_PROJECT_DIR does not exist on the OpenClaw host.",
+    );
+  }
+  if (!stat.isDirectory()) {
+    throw new ConnectorProbeError("project", "EXPO_PROJECT_DIR must be a directory.");
+  }
+
+  const args =
+    operation === "status"
+      ? ["project:status", "--limit", String(Math.max(1, Math.min(limit, 25))), "--json", "--non-interactive"]
+      : ["project:info", "--json", "--non-interactive"];
+
+  const childEnv: NodeJS.ProcessEnv = {
+    PATH: process.env.PATH,
+    HOME: process.env.HOME,
+    USER: process.env.USER,
+    LOGNAME: process.env.LOGNAME,
+    LANG: process.env.LANG,
+    LC_ALL: process.env.LC_ALL,
+    TMPDIR: process.env.TMPDIR,
+    TMP: process.env.TMP,
+    TEMP: process.env.TEMP,
+    CI: "1",
+    EXPO_TOKEN: token,
+  };
+
+  try {
+    const { stdout } = await execFileAsync("eas", args, {
+      cwd: projectDir,
+      env: childEnv,
+      timeout: 60_000,
+      maxBuffer: 4 * 1024 * 1024,
+      windowsHide: true,
+    });
+
+    const text = stdout.trim();
+    let body: unknown = text;
+    try {
+      body = text ? JSON.parse(text) : null;
+    } catch {
+      throw new ConnectorProbeError(
+        "response",
+        "EAS CLI returned non-JSON output for a JSON read command.",
+      );
+    }
+
+    return { ok: true, status: 200, body };
+  } catch (error) {
+    if (error instanceof ConnectorProbeError) throw error;
+
+    const code =
+      error && typeof error === "object" && "code" in error
+        ? String((error as { code?: unknown }).code ?? "")
+        : "";
+
+    if (code === "ENOENT") {
+      throw new ConnectorProbeError(
+        "runtime",
+        "EAS CLI is not installed or is not available in PATH on the OpenClaw host.",
+      );
+    }
+
+    throw new ConnectorProbeError(
+      "service",
+      "EAS CLI could not complete the authenticated Expo project read.",
+    );
+  }
+}
