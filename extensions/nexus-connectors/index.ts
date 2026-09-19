@@ -311,6 +311,19 @@ async function dropboxApi(path: string, payload: unknown) {
     payload,
   );
 }
+function notionHeaders(): Record<string, string> {
+  const token = process.env.NOTION_TOKEN || process.env.NOTION_ACCESS_TOKEN;
+  if (!token) {
+    throw new Error("NOTION_TOKEN or NOTION_ACCESS_TOKEN must be configured on the OpenClaw host.");
+  }
+
+  return {
+    Authorization: `Bearer ${token}`,
+    "Notion-Version": process.env.NOTION_VERSION?.trim() || "2026-03-11",
+    Accept: "application/json",
+    "User-Agent": "nexus-kit-openclaw",
+  };
+}
 
 export default definePluginEntry({
   id: "nexus-connectors",
@@ -429,6 +442,7 @@ export default definePluginEntry({
           Type.Literal("google-contacts"),
           Type.Literal("microsoft-graph"),
           Type.Literal("dropbox"),
+          Type.Literal("notion"),
         ]),
       }),
       async execute(_id, params) {
@@ -508,6 +522,14 @@ export default definePluginEntry({
               );
               checks.push({ name: "people-me", ok: result.ok, status: result.status });
             }
+          }
+
+          if (params.connector === "notion") {
+            const result = await providerGet(
+              "https://api.notion.com/v1/users/me",
+              notionHeaders(),
+            );
+            checks.push({ name: "notion-user", ok: result.ok, status: result.status });
           }
 
           if (params.connector === "dropbox") {
@@ -691,6 +713,62 @@ export default definePluginEntry({
       },
     });
 
+
+    api.registerTool({
+      name: "nexus_notion_read",
+      description:
+        "Read Notion through an independently authenticated OpenClaw route. Supports token identity, workspace search, and page retrieval without using a ChatGPT connector.",
+      parameters: Type.Object({
+        operation: Type.Union([
+          Type.Literal("me"),
+          Type.Literal("search"),
+          Type.Literal("page"),
+        ]),
+        query: Type.Optional(Type.String()),
+        pageId: Type.Optional(Type.String()),
+        pageSize: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
+      }),
+      async execute(_id, params) {
+        try {
+          const headers = notionHeaders();
+
+          if (params.operation === "me") {
+            const result = await providerGet("https://api.notion.com/v1/users/me", headers);
+            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+          }
+
+          if (params.operation === "search") {
+            const result = await providerJsonRequest(
+              "https://api.notion.com/v1/search",
+              "POST",
+              headers,
+              {
+                ...(params.query?.trim() ? { query: params.query.trim() } : {}),
+                page_size: params.pageSize ?? 20,
+                sort: {
+                  direction: "descending",
+                  timestamp: "last_edited_time",
+                },
+              },
+            );
+            return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+          }
+
+          const pageId = params.pageId?.trim();
+          if (!pageId) throw new Error("pageId is required for Notion page retrieval");
+          const result = await providerGet(
+            `https://api.notion.com/v1/pages/${encodeURIComponent(pageId)}`,
+            headers,
+          );
+          return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return {
+            content: [{ type: "text", text: JSON.stringify({ ok: false, error: message }) }],
+          };
+        }
+      },
+    });
 
     api.registerTool({
       name: "nexus_dropbox_read",
