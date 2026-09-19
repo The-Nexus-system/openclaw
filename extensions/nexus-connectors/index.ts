@@ -65,7 +65,72 @@ async function providerGet(url: string, headers: Record<string, string>) {
   };
 }
 
-export default definePluginEntry({
+
+async function getGoogleAccessToken(): Promise<string> {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error(
+      "GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REFRESH_TOKEN must be configured on the OpenClaw host.",
+    );
+  }
+
+  const form = new URLSearchParams({
+    client_id: clientId,
+    client_secret: clientSecret,
+    refresh_token: refreshToken,
+    grant_type: "refresh_token",
+  });
+
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: form.toString(),
+    redirect: "error",
+  });
+
+  const body = (await response.json()) as { access_token?: string; error?: string; error_description?: string };
+  if (!response.ok || !body.access_token) {
+    throw new Error(
+      body.error_description || body.error || `Google token refresh failed with HTTP ${response.status}`,
+    );
+  }
+
+  return body.access_token;
+}
+
+function googleServiceBase(service: string): string {
+  switch (service) {
+    case "gmail":
+      return "https://gmail.googleapis.com/gmail/v1";
+    case "calendar":
+      return "https://www.googleapis.com/calendar/v3";
+    case "drive":
+      return "https://www.googleapis.com/drive/v3";
+    case "people":
+      return "https://people.googleapis.com/v1";
+    default:
+      throw new Error("unsupported Google service");
+  }
+}
+
+function base64UrlEncode(value: string): string {
+  return Buffer.from(value, "utf8")
+    .toString("base64")
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replace(/=+$/u, "");
+}
+
+function safeHeaderValue(value: string, field: string): string {
+  if (value.includes("\r") || value.includes("\n")) {
+    throw new Error(`${field} must not contain line breaks`);
+  }
+  return value.trim();
+}
+\nexport default definePluginEntry({
   id: "nexus-connectors",
   name: "Nexus Connectors",
   description: "Portable connector readiness and independent provider access for the Nexus Kit gateway.",
