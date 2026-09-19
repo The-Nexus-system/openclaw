@@ -322,14 +322,33 @@
       ],
       "credentialEnv": [
         "SPOTIFY_CLIENT_ID",
-        "SPOTIFY_CLIENT_SECRET"
+        "SPOTIFY_CLIENT_SECRET",
+        "SPOTIFY_REFRESH_TOKEN"
       ],
       "targetCapabilities": [
+        "profile.read",
         "library.read",
         "playlists.read",
         "playlists.write"
       ],
-      "state": "planned"
+      "state": "planned",
+      "optionalCredentialEnv": [
+        "SPOTIFY_REDIRECT_URI",
+        "SPOTIFY_SCOPES",
+        "SPOTIFY_GRANTED_SCOPES"
+      ],
+      "requiredReadScopes": [
+        "user-read-private",
+        "playlist-read-private"
+      ],
+      "requiredWriteScopes": [
+        "playlist-modify-private",
+        "playlist-modify-public"
+      ],
+      "notes": [
+        "Use the browser OAuth callback for persistent user access.",
+        "Spotify refresh tokens currently expire after six months; reauthorization must be expected rather than treated as a permanent credential."
+      ]
     },
     {
       "id": "apple-music",
