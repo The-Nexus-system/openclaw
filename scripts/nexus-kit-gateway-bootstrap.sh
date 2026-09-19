@@ -41,6 +41,18 @@ if [ -z "$CLAWTEAM_BIN" ]; then
 fi
 
 ln -sf "$CLAWTEAM_BIN" "$BIN_DIR/clawteam"
+
+chmod 700 \
+  "$REPO_ROOT/scripts/nexus-kit-auth" \
+  "$REPO_ROOT/scripts/nexus-kit-auth-microsoft" \
+  "$REPO_ROOT/scripts/nexus-kit-auth-app-store-connect" \
+  "$REPO_ROOT/scripts/nexus-kit-auth-google-play" \
+  "$REPO_ROOT/scripts/nexus-kit-secret" \
+  "$REPO_ROOT/scripts/nexus-kit-contact-health.sh"
+
+ln -sf "$REPO_ROOT/scripts/nexus-kit-auth" "$BIN_DIR/nexus-kit-auth"
+ln -sf "$REPO_ROOT/scripts/nexus-kit-secret" "$BIN_DIR/nexus-kit-secret"
+ln -sf "$REPO_ROOT/scripts/nexus-kit-contact-health.sh" "$BIN_DIR/nexus-kit-contact-health"
 cp "$CLAWTEAM_DIR/skills/openclaw/SKILL.md" "$CLAWTEAM_SKILL_DIR/SKILL.md"
 cp "$REPO_ROOT/skills/nexus-connectors/SKILL.md" "$CONNECTOR_SKILL_DIR/SKILL.md"
 
