@@ -10,6 +10,8 @@ ROOT = Path(__file__).resolve().parent
 
 PROVIDERS = {
     "microsoft": ROOT / "nexus-kit-auth-microsoft",
+    "google": ROOT / "nexus-kit-auth-google",
+    "google-workspace": ROOT / "nexus-kit-auth-google",
     "app-store-connect": ROOT / "nexus-kit-auth-app-store-connect",
     "apple": ROOT / "nexus-kit-auth-app-store-connect",
     "google-play": ROOT / "nexus-kit-auth-google-play",
