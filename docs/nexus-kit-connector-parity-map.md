@@ -179,3 +179,41 @@ Prefer an Expo Robot user with a scoped access token for the persistent Kit host
 Use EAS CLI and the documented EAS REST API as the primary automation routes. EAS CLI supports non-interactive build, update, submit, metadata, environment, project-status, and related workflows.
 
 A live Expo health check should run an authenticated, read-only EAS command against a real linked project, such as project status/info, rather than treating token presence as proof of access.
+
+
+## Social and communications platforms
+
+### Twilio
+
+Use the official Twilio REST API with a dedicated API key where possible. Prefer a restricted API key scoped to the resources Kit actually needs instead of the main account Auth Token.
+
+Read verification must fetch the real account resource. Token presence alone is not enough.
+
+### Facebook Pages
+
+Use Meta Graph API with an independently authorized user/system token. Page access is verified by successfully enumerating Pages the authorized account manages.
+
+Do not return Page access tokens in normal read-tool output.
+
+### Instagram
+
+For professional Instagram accounts, support either:
+
+- Instagram API with Facebook Login through a linked Facebook Page; or
+- Instagram API with Instagram Login when a direct professional-account token is configured.
+
+Consumer/personal Instagram accounts do not have the same API management surface and must not be represented as equivalent.
+
+### Threads
+
+Use the official Threads API at `graph.threads.net` with an independently authorized Threads access token. Read verification must successfully retrieve the authorized Threads profile.
+
+### Facebook personal profile
+
+Treat personal-profile interaction as a controlled browser surface unless Meta exposes a supported API for the specific requested function. Do not represent Page API access as personal-profile control.
+
+### Facebook Groups
+
+The third-party Facebook Groups API and `publish_to_groups` permission were removed by Meta in April 2024. Group reading/posting/commenting therefore belongs to the controlled-browser layer, not Graph API parity.
+
+A browser-controlled Group route must still use the normal Nexus rules: narrow target, explicit authorization for consequential posts/edits, and postcondition verification.
