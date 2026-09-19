@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { getConnectorSecret } from "./connector-secrets.js";
+import { getConnectorSecret, setConnectorSecret } from "./connector-secrets.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -404,6 +404,7 @@ export async function getZoomAccessToken(): Promise<{ token: string; mode: "dire
     );
     const data = (await response.json().catch(() => ({}))) as {
       access_token?: string;
+      refresh_token?: string;
       error?: string;
       reason?: string;
     };
@@ -412,6 +413,9 @@ export async function getZoomAccessToken(): Promise<{ token: string; mode: "dire
         "token-refresh",
         data.reason ?? data.error ?? `Zoom OAuth HTTP ${response.status}`,
       );
+    }
+    if (data.refresh_token) {
+      setConnectorSecret("ZOOM_REFRESH_TOKEN", data.refresh_token);
     }
     return { token: data.access_token, mode: "refresh" };
   }
