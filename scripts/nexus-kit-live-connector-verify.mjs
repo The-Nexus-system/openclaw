@@ -47,6 +47,56 @@ async function googleToken() {
   return data.access_token;
 }
 
+async function zoomAccess() {
+  if (process.env.ZOOM_ACCESS_TOKEN) {
+    return { token: process.env.ZOOM_ACCESS_TOKEN, mode: "direct" };
+  }
+
+  const clientId = process.env.ZOOM_CLIENT_ID;
+  const clientSecret = process.env.ZOOM_CLIENT_SECRET;
+  if (!clientId || !clientSecret) return null;
+
+  const basic = Buffer.from(`${clientId}:${clientSecret}`, "utf8").toString("base64");
+
+  if (process.env.ZOOM_REFRESH_TOKEN) {
+    const response = await fetch(
+      `https://zoom.us/oauth/token?grant_type=refresh_token&refresh_token=${encodeURIComponent(process.env.ZOOM_REFRESH_TOKEN)}`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${basic}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        redirect: "error",
+      },
+    );
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.access_token) {
+      throw new Error(data.reason || data.error || `Zoom OAuth HTTP ${response.status}`);
+    }
+    return { token: data.access_token, mode: "refresh" };
+  }
+
+  if (!process.env.ZOOM_ACCOUNT_ID) return null;
+
+  const response = await fetch(
+    `https://zoom.us/oauth/token?grant_type=account_credentials&account_id=${encodeURIComponent(process.env.ZOOM_ACCOUNT_ID)}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${basic}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      redirect: "error",
+    },
+  );
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.access_token) {
+    throw new Error(data.reason || data.error || `Zoom server OAuth HTTP ${response.status}`);
+  }
+  return { token: data.access_token, mode: "server-to-server" };
+}
+
 async function dropboxToken() {
   if (process.env.DROPBOX_ACCESS_TOKEN) return process.env.DROPBOX_ACCESS_TOKEN;
 
@@ -198,6 +248,45 @@ async function probeGoogle(kind) {
   };
 }
 
+async function probeZoom() {
+  const auth = await zoomAccess();
+  if (!auth) return { connector: "zoom", state: "unconfigured" };
+
+  const userId =
+    auth.mode === "server-to-server"
+      ? process.env.ZOOM_USER_ID?.trim()
+      : "me";
+
+  if (!userId) {
+    return {
+      connector: "zoom",
+      state: "unconfigured",
+      error: "ZOOM_USER_ID is required for server-to-server verification.",
+    };
+  }
+
+  const result = await getJson(
+    `https://api.zoom.us/v2/users/${encodeURIComponent(userId)}/meetings?type=previous_meetings&page_size=1`,
+    {
+      Authorization: `Bearer ${auth.token}`,
+      Accept: "application/json",
+      "User-Agent": "nexus-kit-openclaw",
+    },
+  );
+
+  return {
+    connector: "zoom",
+    state: result.ok ? "read-verified" : "failed",
+    checks: [
+      {
+        endpoint: "previous meetings",
+        ok: result.ok,
+        status: result.status,
+      },
+    ],
+  };
+}
+
 async function probeLinear() {
   const apiKey = process.env.LINEAR_API_KEY;
   const accessToken = process.env.LINEAR_ACCESS_TOKEN;
@@ -333,6 +422,7 @@ const probes = {
   dropbox: probeDropbox,
   notion: probeNotion,
   linear: probeLinear,
+  zoom: probeZoom,
 };
 
 const selected = target === "all" ? Object.keys(probes) : [target];
