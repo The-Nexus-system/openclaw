@@ -138,6 +138,65 @@ function safeHeaderValue(value: string, field: string): string {
   return value.trim();
 }
 
+async function getMicrosoftAccessToken(): Promise<string> {
+  const clientId = process.env.MICROSOFT_CLIENT_ID;
+  const refreshToken = process.env.MICROSOFT_REFRESH_TOKEN;
+  const tenant = process.env.MICROSOFT_TENANT_ID?.trim() || "common";
+  const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
+  const scope =
+    process.env.MICROSOFT_SCOPES?.trim() ||
+    "openid offline_access User.Read Mail.Read Calendars.Read";
+
+  if (!clientId || !refreshToken) {
+    throw new Error(
+      "MICROSOFT_CLIENT_ID and MICROSOFT_REFRESH_TOKEN must be configured on the OpenClaw host.",
+    );
+  }
+
+  const form = new URLSearchParams({
+    client_id: clientId,
+    refresh_token: refreshToken,
+    grant_type: "refresh_token",
+    scope,
+  });
+  if (clientSecret) {
+    form.set("client_secret", clientSecret);
+  }
+
+  const response = await fetch(
+    `https://login.microsoftonline.com/${encodeURIComponent(tenant)}/oauth2/v2.0/token`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: form.toString(),
+      redirect: "error",
+    },
+  );
+
+  const text = await response.text();
+  let body: {
+    access_token?: string;
+    refresh_token?: string;
+    error?: string;
+    error_description?: string;
+  } = {};
+  try {
+    body = text ? JSON.parse(text) : {};
+  } catch {
+    throw new Error(`Microsoft token refresh returned non-JSON HTTP ${response.status}`);
+  }
+
+  if (!response.ok || !body.access_token) {
+    throw new Error(
+      body.error_description ??
+        body.error ??
+        `Microsoft token refresh failed with HTTP ${response.status}`,
+    );
+  }
+
+  return body.access_token;
+}
+
 export default definePluginEntry({
   id: "nexus-connectors",
   name: "Nexus Connectors",
@@ -299,6 +358,36 @@ export default definePluginEntry({
         try {
           const apiPath = normalizeApiPath(params.path);
           const result = await providerGet(`https://api.digitalocean.com/v2${apiPath}`, {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+            "User-Agent": "nexus-kit-openclaw",
+          });
+          return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return {
+            content: [{ type: "text", text: JSON.stringify({ ok: false, error: message }) }],
+          };
+        }
+      },
+    });
+
+
+    api.registerTool({
+      name: "nexus_microsoft_graph_get",
+      description:
+        "Perform an independently authenticated read-only GET against Microsoft Graph using OAuth credentials stored on the OpenClaw host. This is for Outlook mail/calendar and related Microsoft Graph reads and does not use a ChatGPT connector.",
+      parameters: Type.Object({
+        path: Type.String({
+          description:
+            "Microsoft Graph v1.0 provider-relative path such as /me, /me/messages?$top=10, or /me/calendars.",
+        }),
+      }),
+      async execute(_id, params) {
+        try {
+          const token = await getMicrosoftAccessToken();
+          const apiPath = normalizeApiPath(params.path);
+          const result = await providerGet(`https://graph.microsoft.com/v1.0${apiPath}`, {
             Authorization: `Bearer ${token}`,
             Accept: "application/json",
             "User-Agent": "nexus-kit-openclaw",
