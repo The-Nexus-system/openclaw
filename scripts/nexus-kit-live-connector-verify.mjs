@@ -1,8 +1,12 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const target = (process.argv[2] || "all").toLowerCase();
+const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(SCRIPT_DIR, "..");
 
 const PROBES = [
   "github",
@@ -29,6 +33,7 @@ const PROBES = [
   "meta-developer",
   "app-store-connect",
   "google-play",
+  "metricool",
 ];
 
 function out(record) {
@@ -191,6 +196,60 @@ function invokeProbe(connector) {
   };
 }
 
+
+function invokeMetricoolProbe() {
+  const script = path.join(REPO_ROOT, "scripts", "nexus-kit-metricool-probe");
+  const proc = spawnSync("python3", [script], {
+    encoding: "utf8",
+    maxBuffer: 8 * 1024 * 1024,
+    env: process.env,
+  });
+
+  if (proc.error) {
+    return {
+      connector: "metricool",
+      state: "failed",
+      error: proc.error.message,
+    };
+  }
+
+  const lines = (proc.stdout || "")
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  let payload;
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    try {
+      payload = JSON.parse(lines[index]);
+      break;
+    } catch {
+      // Ignore non-JSON diagnostic lines and keep looking for the probe record.
+    }
+  }
+
+  if (!payload || typeof payload !== "object") {
+    return {
+      connector: "metricool",
+      state: "failed",
+      exitCode: proc.status,
+      error: "Metricool MCP probe returned no JSON result.",
+    };
+  }
+
+  const state = payload.state;
+  if (state === "read-verified" || state === "unconfigured") {
+    return payload;
+  }
+
+  return {
+    ...payload,
+    connector: "metricool",
+    state: "failed",
+    ...(proc.status !== 0 ? { exitCode: proc.status } : {}),
+  };
+}
+
 const selected = target === "all" ? PROBES : [target];
 
 let failures = 0;
@@ -201,7 +260,7 @@ for (const connector of selected) {
     continue;
   }
 
-  const result = invokeProbe(connector);
+  const result = connector === "metricool" ? invokeMetricoolProbe() : invokeProbe(connector);
   out(result);
   if (result.state === "failed" || result.state === "unknown-connector") {
     failures += 1;
