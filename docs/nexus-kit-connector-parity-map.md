@@ -152,3 +152,30 @@ For each provider:
 4. mark read-verified only after success;
 5. test write behavior only when explicitly needed and authorized;
 6. verify the write postcondition before marking write-verified.
+
+
+## Developer platforms
+
+### OpenAI API
+
+Use a dedicated project or service-account key for Kit where possible. Keep the key in protected secret storage and verify with a harmless API read before enabling consequential use.
+
+### Google Play
+
+Prefer Android Publisher / Play Developer Reporting APIs with a dedicated service account. Use browser automation only for console-only settings.
+
+### Meta for Developers
+
+Prefer Graph API and scoped system-user/user tokens. Some app configuration and review surfaces remain web-console-only and should use controlled browser automation when needed.
+
+### App Store Connect
+
+Prefer App Store Connect API keys and JWT authentication for builds, TestFlight, app metadata, and other supported publishing operations. Use the web console only for surfaces the API does not expose.
+
+### Expo / EAS
+
+Prefer an Expo Robot user with a scoped access token for the persistent Kit host. Store it as `EXPO_TOKEN` in protected secret storage.
+
+Use EAS CLI and the documented EAS REST API as the primary automation routes. EAS CLI supports non-interactive build, update, submit, metadata, environment, project-status, and related workflows.
+
+A live Expo health check should run an authenticated, read-only EAS command against a real linked project, such as project status/info, rather than treating token presence as proof of access.
