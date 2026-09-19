@@ -1,0 +1,166 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+
+from nexus_kit_secret_store import get, set_secret
+
+DEFAULT_READ_SCOPES = [
+    "openid",
+    "offline_access",
+    "User.Read",
+    "Mail.Read",
+    "Calendars.Read",
+]
+WRITE_SCOPES = ["Mail.Send", "Calendars.ReadWrite"]
+
+
+def post_form(url: str, fields: dict[str, str]) -> tuple[int, dict]:
+    data = urllib.parse.urlencode(fields).encode("utf-8")
+    request = urllib.request.Request(
+        url,
+        data=data,
+        method="POST",
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return response.status, json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        raw = exc.read().decode("utf-8", "replace")
+        try:
+            body = json.loads(raw)
+        except json.JSONDecodeError:
+            body = {"error": "http_error", "error_description": raw}
+        return exc.code, body
+
+
+def require_client_id() -> str:
+    client_id = get("MICROSOFT_CLIENT_ID")
+    if client_id:
+        return client_id
+
+    print()
+    print("Microsoft authorization needs the Application (client) ID from the one-time app registration.")
+    print("Paste only that client ID here. It is an identifier, not your Microsoft password.")
+    client_id = input("Microsoft client ID: ").strip()
+    if not client_id:
+        raise SystemExit("No client ID entered; nothing changed.")
+    set_secret("MICROSOFT_CLIENT_ID", client_id)
+    return client_id
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Authorize Nexus Kit to Microsoft Graph using the accessible device-code flow."
+    )
+    parser.add_argument(
+        "--write",
+        action="store_true",
+        help="Also request mail-send and calendar-write permissions.",
+    )
+    parser.add_argument(
+        "--tenant",
+        default=None,
+        help="Microsoft tenant name/id. Defaults to saved value or common.",
+    )
+    args = parser.parse_args()
+
+    client_id = require_client_id()
+    tenant = args.tenant or get("MICROSOFT_TENANT_ID") or "common"
+    scopes = list(DEFAULT_READ_SCOPES)
+    if args.write:
+        scopes.extend(WRITE_SCOPES)
+    scopes = list(dict.fromkeys(scopes))
+    scope_text = " ".join(scopes)
+
+    device_url = (
+        "https://login.microsoftonline.com/"
+        + urllib.parse.quote(tenant, safe="")
+        + "/oauth2/v2.0/devicecode"
+    )
+    status, device = post_form(
+        device_url,
+        {
+            "client_id": client_id,
+            "scope": scope_text,
+        },
+    )
+    if status >= 400 or not device.get("device_code"):
+        message = device.get("error_description") or device.get("error") or f"HTTP {status}"
+        raise SystemExit(f"Microsoft device authorization could not start: {message}")
+
+    verification_uri = device.get("verification_uri") or "https://microsoft.com/devicelogin"
+    user_code = device.get("user_code")
+    expires_in = int(device.get("expires_in", 900))
+    interval = max(int(device.get("interval", 5)), 5)
+
+    print()
+    print("Microsoft authorization is ready.")
+    print(f"Open this link on your phone: {verification_uri}")
+    print(f"Enter this code: {user_code}")
+    print()
+    print("Approve the Microsoft account and permissions. You do not need to copy any token back here.")
+    print("This command will wait and store the refresh token automatically.")
+
+    token_url = (
+        "https://login.microsoftonline.com/"
+        + urllib.parse.quote(tenant, safe="")
+        + "/oauth2/v2.0/token"
+    )
+    deadline = time.monotonic() + expires_in
+
+    while time.monotonic() < deadline:
+        time.sleep(interval)
+        status, token = post_form(
+            token_url,
+            {
+                "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+                "client_id": client_id,
+                "device_code": str(device["device_code"]),
+            },
+        )
+
+        if status < 400 and token.get("access_token"):
+            refresh_token = token.get("refresh_token")
+            if not refresh_token:
+                raise SystemExit(
+                    "Microsoft authorized the account but did not return a refresh token. "
+                    "Make sure offline_access is allowed, then try again."
+                )
+
+            set_secret("MICROSOFT_REFRESH_TOKEN", str(refresh_token))
+            set_secret("MICROSOFT_TENANT_ID", tenant)
+            set_secret("MICROSOFT_SCOPES", str(token.get("scope") or scope_text))
+
+            print()
+            print("Microsoft authorization succeeded.")
+            print("The refresh token was stored directly in the protected OpenClaw connector vault.")
+            print("No Microsoft password or token was printed.")
+            print("Next: run the Microsoft connector health probe to verify identity, mail, and calendar.")
+            return
+
+        error = token.get("error")
+        if error == "authorization_pending":
+            continue
+        if error == "slow_down":
+            interval += 5
+            continue
+        if error in {"authorization_declined", "expired_token", "bad_verification_code"}:
+            description = token.get("error_description") or error
+            raise SystemExit(f"Microsoft authorization stopped: {description}")
+
+        description = token.get("error_description") or error or f"HTTP {status}"
+        raise SystemExit(f"Microsoft token request failed: {description}")
+
+    raise SystemExit("Microsoft authorization code expired before approval. Run the command again.")
+
+
+if __name__ == "__main__":
+    main()
