@@ -465,6 +465,146 @@
       ],
       "state": "planned",
       "verificationPolicy": "Token issuance proves authentication only. Do not mark read-verified or write-verified until a real PDF Services operation succeeds and its output is retrieved."
+    },
+    {
+      "id": "openai-api",
+      "provider": "OpenAI",
+      "priority": 1,
+      "routes": [
+        "official-api",
+        "openclaw-model-provider",
+        "browser-console-last-resort"
+      ],
+      "credentialEnv": [
+        "OPENAI_API_KEY"
+      ],
+      "optionalCredentialEnv": [
+        "OPENAI_PROJECT_ID",
+        "OPENAI_ORG_ID"
+      ],
+      "targetCapabilities": [
+        "models.list",
+        "responses.create",
+        "files.read",
+        "files.write",
+        "project.resources.read",
+        "project.resources.write"
+      ],
+      "state": "planned",
+      "requiredReadScopes": [
+        "project-api-key"
+      ],
+      "requiredWriteScopes": [
+        "project-api-key"
+      ]
+    },
+    {
+      "id": "google-play",
+      "provider": "Google Play",
+      "priority": 2,
+      "routes": [
+        "android-publisher-api",
+        "play-developer-reporting-api",
+        "service-account",
+        "oauth",
+        "browser-console-last-resort"
+      ],
+      "credentialAlternatives": [
+        [
+          "GOOGLE_PLAY_SERVICE_ACCOUNT_JSON"
+        ],
+        [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET",
+          "GOOGLE_PLAY_REFRESH_TOKEN"
+        ]
+      ],
+      "optionalCredentialEnv": [
+        "GOOGLE_PLAY_PACKAGE_NAME"
+      ],
+      "targetCapabilities": [
+        "apps.read",
+        "releases.read",
+        "releases.write",
+        "tracks.read",
+        "tracks.write",
+        "reviews.read",
+        "reviews.reply",
+        "reports.read"
+      ],
+      "state": "planned",
+      "requiredReadScopes": [
+        "https://www.googleapis.com/auth/androidpublisher"
+      ],
+      "requiredWriteScopes": [
+        "https://www.googleapis.com/auth/androidpublisher"
+      ]
+    },
+    {
+      "id": "meta-developer",
+      "provider": "Meta",
+      "priority": 2,
+      "routes": [
+        "graph-api",
+        "system-user-token",
+        "oauth",
+        "browser-console-last-resort"
+      ],
+      "credentialAlternatives": [
+        [
+          "META_ACCESS_TOKEN"
+        ],
+        [
+          "META_APP_ID",
+          "META_APP_SECRET",
+          "META_USER_ACCESS_TOKEN"
+        ]
+      ],
+      "optionalCredentialEnv": [
+        "META_BUSINESS_ID",
+        "META_PAGE_ID",
+        "META_INSTAGRAM_ACCOUNT_ID"
+      ],
+      "targetCapabilities": [
+        "apps.read",
+        "graph.read",
+        "pages.read",
+        "pages.write",
+        "instagram.read",
+        "instagram.write"
+      ],
+      "state": "planned"
+    },
+    {
+      "id": "app-store-connect",
+      "provider": "Apple",
+      "priority": 1,
+      "routes": [
+        "app-store-connect-api",
+        "jwt-api-key",
+        "transporter",
+        "browser-console-last-resort"
+      ],
+      "credentialEnv": [
+        "APPSTORE_ISSUER_ID",
+        "APPSTORE_KEY_ID",
+        "APPSTORE_PRIVATE_KEY"
+      ],
+      "optionalCredentialEnv": [
+        "APPSTORE_VENDOR_NUMBER"
+      ],
+      "targetCapabilities": [
+        "apps.read",
+        "builds.read",
+        "testflight.read",
+        "testflight.write",
+        "metadata.read",
+        "metadata.write",
+        "review.read",
+        "review.write",
+        "assets.write"
+      ],
+      "state": "planned"
     }
   ]
 }
