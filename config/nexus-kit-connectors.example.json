@@ -49,7 +49,11 @@
         "mail.send",
         "mail.modify"
       ],
-      "state": "planned"
+      "state": "planned",
+      "optionalCredentialEnv": [
+        "GOOGLE_REDIRECT_URI",
+        "GOOGLE_GRANTED_SCOPES"
+      ]
     },
     {
       "id": "google-calendar",
@@ -69,7 +73,11 @@
         "calendar.read",
         "calendar.write"
       ],
-      "state": "planned"
+      "state": "planned",
+      "optionalCredentialEnv": [
+        "GOOGLE_REDIRECT_URI",
+        "GOOGLE_GRANTED_SCOPES"
+      ]
     },
     {
       "id": "google-drive",
@@ -90,7 +98,11 @@
         "drive.read",
         "drive.write"
       ],
-      "state": "planned"
+      "state": "planned",
+      "optionalCredentialEnv": [
+        "GOOGLE_REDIRECT_URI",
+        "GOOGLE_GRANTED_SCOPES"
+      ]
     },
     {
       "id": "google-contacts",
@@ -110,7 +122,11 @@
         "contacts.search",
         "contacts.read"
       ],
-      "state": "planned"
+      "state": "planned",
+      "optionalCredentialEnv": [
+        "GOOGLE_REDIRECT_URI",
+        "GOOGLE_GRANTED_SCOPES"
+      ]
     },
     {
       "id": "digitalocean",
