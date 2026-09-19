@@ -5,6 +5,7 @@ import { registerGoogleTools } from "./google-tools.js";
 import { registerGoogleOAuth } from "./google-oauth.js";
 import { registerMicrosoftTools } from "./microsoft-tools.js";
 import { registerStatusTools } from "./status-tools.js";
+import { registerSocialTools } from "./social-tools.js";
 export default definePluginEntry({
   id: "nexus-connectors",
   name: "Nexus Connectors",
@@ -26,5 +27,6 @@ export default definePluginEntry({
     registerMicrosoftTools(api);
     registerGoogleTools(api);
     registerGoogleOAuth(api);
+    registerSocialTools(api);
   },
 });
