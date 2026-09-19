@@ -47,10 +47,19 @@ if [ ! -f "$CONNECTOR_STATE_DIR/connectors.json" ]; then
   chmod 600 "$CONNECTOR_STATE_DIR/connectors.json" 2>/dev/null || true
 fi
 
-if command -v openclaw >/dev/null 2>&1; then
-  openclaw approvals allowlist add --agent "*" "*/clawteam" >/dev/null 2>&1 || true
-  openclaw plugins enable nexus-connectors >/dev/null 2>&1 || true
+if ! command -v openclaw >/dev/null 2>&1; then
+  echo "OpenClaw executable not found; cannot verify the Kit gateway." >&2
+  exit 1
 fi
+
+openclaw approvals allowlist add --agent "*" "*/clawteam" >/dev/null 2>&1 || true
+
+if ! openclaw plugins inspect nexus-connectors --json >/dev/null 2>&1; then
+  openclaw plugins install --link "$REPO_ROOT/extensions/nexus-connectors"
+fi
+
+openclaw plugins enable nexus-connectors
+openclaw plugins inspect nexus-connectors --json > "$CONNECTOR_STATE_DIR/nexus-connectors.inspect.json"
 
 clawteam config set transport file >/dev/null 2>&1 || true
 clawteam config health
@@ -62,9 +71,7 @@ NEXUS_CONNECTOR_REGISTRY="$CONNECTOR_STATE_DIR/connectors.json" \
 
 node "$REPO_ROOT/scripts/nexus-kit-live-connector-verify.mjs" all || true
 
-if command -v openclaw >/dev/null 2>&1; then
-  openclaw plugins inspect nexus-connectors --json >/dev/null 2>&1 || true
-fi
+openclaw plugins inspect nexus-connectors --json > "$CONNECTOR_STATE_DIR/nexus-connectors.inspect.json"
 
 echo "Kit gateway integration ready."
 echo "OpenClaw remains the persistent gateway."
