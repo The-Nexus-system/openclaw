@@ -37,7 +37,12 @@ echo "2/3 — Targeted connector tests"
 if command -v pnpm >/dev/null 2>&1 && [ -d "$REPO_ROOT/node_modules" ]; then
   (
     cd "$REPO_ROOT"
-    pnpm exec vitest run       extensions/nexus-connectors/index.test.ts       extensions/nexus-connectors/creative-shared.test.ts
+    pnpm exec vitest run \
+      extensions/nexus-connectors/index.test.ts \
+      extensions/nexus-connectors/connector-secrets.test.ts \
+      extensions/nexus-connectors/google-oauth.test.ts \
+      extensions/nexus-connectors/status-tools.test.ts \
+      extensions/nexus-connectors/creative-shared.test.ts
   )
   echo "PASS: targeted connector tests"
 else
