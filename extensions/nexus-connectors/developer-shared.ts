@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { getConnectorSecret } from "./connector-secrets.js";
+import { getConnectorSecret, getRotatingConnectorSecret } from "./connector-secrets.js";
 import { ConnectorProbeError, providerGet } from "./shared.js";
 import { metaGraphVersion } from "./social-shared.js";
 
@@ -245,7 +245,7 @@ async function getGooglePlayServiceAccountToken(account: GoogleServiceAccount): 
 async function getGooglePlayRefreshTokenAccessToken(): Promise<string> {
   const clientId = getConnectorSecret("GOOGLE_CLIENT_ID");
   const clientSecret = getConnectorSecret("GOOGLE_CLIENT_SECRET");
-  const refreshToken = getConnectorSecret("GOOGLE_PLAY_REFRESH_TOKEN");
+  const refreshToken = getRotatingConnectorSecret("GOOGLE_PLAY_REFRESH_TOKEN");
 
   if (!clientId || !clientSecret || !refreshToken) {
     throw new ConnectorProbeError(
