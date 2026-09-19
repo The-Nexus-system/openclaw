@@ -153,3 +153,113 @@ describe("nexus-connectors Microsoft health probe", () => {
     expect(payload.error).toContain("MICROSOFT_CLIENT_ID and MICROSOFT_REFRESH_TOKEN");
   });
 });
+
+
+describe("nexus-connectors Dropbox health probe", () => {
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    delete process.env.DROPBOX_ACCESS_TOKEN;
+    delete process.env.DROPBOX_APP_KEY;
+    delete process.env.DROPBOX_APP_SECRET;
+    delete process.env.DROPBOX_REFRESH_TOKEN;
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("marks Dropbox read-verified when a direct access token reaches the account endpoint", async () => {
+    process.env.DROPBOX_ACCESS_TOKEN = "dropbox-direct";
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      expect(url).toBe("https://api.dropboxapi.com/2/users/get_current_account");
+      expect(init?.method).toBe("POST");
+      expect((init?.headers as Record<string, string>).Authorization).toBe(
+        "Bearer dropbox-direct",
+      );
+      return jsonResponse({
+        account_id: "dbid:test",
+        name: { display_name: "Nexus System" },
+      });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const tool = getTool("nexus_connector_probe");
+    const result = await tool.execute("test", { connector: "dropbox" });
+    const payload = JSON.parse(result.content[0].text);
+
+    expect(payload.readVerified).toBe(true);
+    expect(payload.checks).toEqual([
+      { name: "dropbox-account", ok: true, status: 200 },
+    ]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshes Dropbox OAuth before probing the account endpoint", async () => {
+    process.env.DROPBOX_APP_KEY = "app-key";
+    process.env.DROPBOX_APP_SECRET = "app-secret";
+    process.env.DROPBOX_REFRESH_TOKEN = "refresh-token";
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+
+      if (url === "https://api.dropboxapi.com/oauth2/token") {
+        expect(init?.method).toBe("POST");
+        return jsonResponse({ access_token: "dropbox-refreshed" });
+      }
+
+      expect(url).toBe("https://api.dropboxapi.com/2/users/get_current_account");
+      expect((init?.headers as Record<string, string>).Authorization).toBe(
+        "Bearer dropbox-refreshed",
+      );
+      return jsonResponse({ account_id: "dbid:test" });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const tool = getTool("nexus_connector_probe");
+    const result = await tool.execute("test", { connector: "dropbox" });
+    const payload = JSON.parse(result.content[0].text);
+
+    expect(payload.readVerified).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("reports the Dropbox account stage when authentication succeeds but the provider rejects the probe", async () => {
+    process.env.DROPBOX_ACCESS_TOKEN = "dropbox-direct";
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse({ error_summary: "invalid_access_token/" }, 401)),
+    );
+
+    const tool = getTool("nexus_connector_probe");
+    const result = await tool.execute("test", { connector: "dropbox" });
+    const payload = JSON.parse(result.content[0].text);
+
+    expect(payload.readVerified).toBe(false);
+    expect(payload.phase).toBe("account");
+    expect(payload.checks).toEqual([
+      { name: "dropbox-account", ok: false, status: 401 },
+    ]);
+  });
+
+  it("reports missing Dropbox credentials without attempting a provider request", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const tool = getTool("nexus_connector_probe");
+    const result = await tool.execute("test", { connector: "dropbox" });
+    const payload = JSON.parse(result.content[0].text);
+
+    expect(payload.readVerified).toBe(false);
+    expect(payload.phase).toBe("credentials");
+    expect(payload.checks).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
