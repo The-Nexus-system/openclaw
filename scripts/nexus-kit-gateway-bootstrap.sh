@@ -69,9 +69,8 @@ clawteam config health
 NEXUS_CONNECTOR_REGISTRY="$CONNECTOR_STATE_DIR/connectors.json" \
   "$REPO_ROOT/scripts/nexus-kit-connector-audit.sh" || true
 
-node "$REPO_ROOT/scripts/nexus-kit-live-connector-verify.mjs" all || true
-
-openclaw plugins inspect nexus-connectors --json > "$CONNECTOR_STATE_DIR/nexus-connectors.inspect.json"
+NEXUS_KIT_STATE_DIR="$CONNECTOR_STATE_DIR" \
+  "$REPO_ROOT/scripts/nexus-kit-connector-selftest.sh"
 
 echo "Kit gateway integration ready."
 echo "OpenClaw remains the persistent gateway."
