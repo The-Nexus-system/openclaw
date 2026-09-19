@@ -237,16 +237,25 @@
         "official-api",
         "openclaw-plugin"
       ],
-      "credentialEnv": [
-        "LINEAR_API_KEY"
-      ],
+      "credentialEnv": [],
       "targetCapabilities": [
         "issues.read",
         "issues.write",
         "projects.read",
         "projects.write"
       ],
-      "state": "planned"
+      "state": "planned",
+      "credentialAlternatives": [
+        [
+          "LINEAR_API_KEY"
+        ],
+        [
+          "LINEAR_ACCESS_TOKEN"
+        ]
+      ],
+      "notes": [
+        "Personal API key is the preferred always-on single-user route; OAuth access tokens are also supported."
+      ]
     },
     {
       "id": "zoom",
