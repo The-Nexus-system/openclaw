@@ -10,6 +10,8 @@ const {
   threadsIdentity,
   twilioAccountSid,
   twilioGet,
+  openAIGet,
+  metaDeveloperAppRead,
 } = vi.hoisted(() => ({
   providerGet: vi.fn(),
   getMicrosoftAccessToken: vi.fn(),
@@ -19,6 +21,8 @@ const {
   threadsIdentity: vi.fn(),
   twilioAccountSid: vi.fn(),
   twilioGet: vi.fn(),
+  openAIGet: vi.fn(),
+  metaDeveloperAppRead: vi.fn(),
 }));
 
 vi.mock("./shared.js", () => ({
@@ -40,6 +44,11 @@ vi.mock("./shared.js", () => ({
   getZoomAccessToken: vi.fn(),
   zoomTargetUser: vi.fn(),
   runExpoProjectRead,
+}));
+
+vi.mock("./developer-shared.js", () => ({
+  openAIGet,
+  metaDeveloperAppRead,
 }));
 
 vi.mock("./social-shared.js", () => ({
@@ -219,6 +228,53 @@ describe("nexus_connector_probe social providers", () => {
     expect(payload.readVerified).toBe(true);
     expect(payload.checks).toEqual([
       { name: "threads-profile", ok: true, status: 200 },
+    ]);
+  });
+});
+
+
+describe("nexus_connector_probe developer platforms", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("marks OpenAI read-verified only after the live models endpoint succeeds", async () => {
+    openAIGet.mockResolvedValue(response());
+
+    const probe = registerAndGetProbe();
+    const result = await probe.execute("test", { connector: "openai-api" });
+    const payload = JSON.parse(result.content[0]?.text ?? "{}");
+
+    expect(payload.readVerified).toBe(true);
+    expect(payload.checks).toEqual([
+      { name: "openai-models", ok: true, status: 200 },
+    ]);
+    expect(openAIGet).toHaveBeenCalledWith("/models");
+  });
+
+  it("does not mark OpenAI verified when the API key is denied", async () => {
+    openAIGet.mockResolvedValue(response(false, 401));
+
+    const probe = registerAndGetProbe();
+    const result = await probe.execute("test", { connector: "openai-api" });
+    const payload = JSON.parse(result.content[0]?.text ?? "{}");
+
+    expect(payload.readVerified).toBe(false);
+    expect(payload.checks).toEqual([
+      { name: "openai-models", ok: false, status: 401 },
+    ]);
+  });
+
+  it("marks Meta Developer verified after the configured app object is readable", async () => {
+    metaDeveloperAppRead.mockResolvedValue(response());
+
+    const probe = registerAndGetProbe();
+    const result = await probe.execute("test", { connector: "meta-developer" });
+    const payload = JSON.parse(result.content[0]?.text ?? "{}");
+
+    expect(payload.readVerified).toBe(true);
+    expect(payload.checks).toEqual([
+      { name: "meta-developer-app", ok: true, status: 200 },
     ]);
   });
 });
