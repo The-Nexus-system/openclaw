@@ -314,7 +314,10 @@ export async function dropboxApi(path: string, payload: unknown) {
 export function notionHeaders(): Record<string, string> {
   const token = process.env.NOTION_TOKEN || process.env.NOTION_ACCESS_TOKEN;
   if (!token) {
-    throw new Error("NOTION_TOKEN or NOTION_ACCESS_TOKEN must be configured on the OpenClaw host.");
+    throw new ConnectorProbeError(
+      "credentials",
+      "NOTION_TOKEN or NOTION_ACCESS_TOKEN must be configured on the OpenClaw host.",
+    );
   }
 
   return {
@@ -328,7 +331,10 @@ export async function linearGraphql(query: string, variables: Record<string, unk
   const apiKey = process.env.LINEAR_API_KEY;
   const accessToken = process.env.LINEAR_ACCESS_TOKEN;
   if (!apiKey && !accessToken) {
-    throw new Error("LINEAR_API_KEY or LINEAR_ACCESS_TOKEN must be configured on the OpenClaw host.");
+    throw new ConnectorProbeError(
+      "credentials",
+      "LINEAR_API_KEY or LINEAR_ACCESS_TOKEN must be configured on the OpenClaw host.",
+    );
   }
 
   const response = await fetch("https://api.linear.app/graphql", {
@@ -370,7 +376,8 @@ export async function getZoomAccessToken(): Promise<{ token: string; mode: "dire
   const clientId = process.env.ZOOM_CLIENT_ID;
   const clientSecret = process.env.ZOOM_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
-    throw new Error(
+    throw new ConnectorProbeError(
+      "credentials",
       "Configure ZOOM_ACCESS_TOKEN or ZOOM_CLIENT_ID and ZOOM_CLIENT_SECRET on the OpenClaw host.",
     );
   }
@@ -396,14 +403,18 @@ export async function getZoomAccessToken(): Promise<{ token: string; mode: "dire
       reason?: string;
     };
     if (!response.ok || !data.access_token) {
-      throw new Error(data.reason ?? data.error ?? `Zoom OAuth HTTP ${response.status}`);
+      throw new ConnectorProbeError(
+        "token-refresh",
+        data.reason ?? data.error ?? `Zoom OAuth HTTP ${response.status}`,
+      );
     }
     return { token: data.access_token, mode: "refresh" };
   }
 
   const accountId = process.env.ZOOM_ACCOUNT_ID;
   if (!accountId) {
-    throw new Error(
+    throw new ConnectorProbeError(
+      "credentials",
       "ZOOM_ACCOUNT_ID is required for Zoom server-to-server OAuth when no direct or refresh token is configured.",
     );
   }
@@ -425,7 +436,10 @@ export async function getZoomAccessToken(): Promise<{ token: string; mode: "dire
     reason?: string;
   };
   if (!response.ok || !data.access_token) {
-    throw new Error(data.reason ?? data.error ?? `Zoom server OAuth HTTP ${response.status}`);
+    throw new ConnectorProbeError(
+      "token-refresh",
+      data.reason ?? data.error ?? `Zoom server OAuth HTTP ${response.status}`,
+    );
   }
   return { token: data.access_token, mode: "server-to-server" };
 }
@@ -436,7 +450,10 @@ export function zoomTargetUser(mode: "direct" | "refresh" | "server-to-server", 
   if (mode === "server-to-server") {
     const configured = process.env.ZOOM_USER_ID?.trim();
     if (!configured) {
-      throw new Error("ZOOM_USER_ID or an explicit userId is required for server-to-server Zoom access.");
+      throw new ConnectorProbeError(
+        "target-user",
+        "ZOOM_USER_ID or an explicit userId is required for server-to-server Zoom access.",
+      );
     }
     return configured;
   }
@@ -447,7 +464,10 @@ export function figmaHeaders(): Record<string, string> {
   const oauthToken = process.env.FIGMA_ACCESS_TOKEN;
 
   if (!personalToken && !oauthToken) {
-    throw new Error("FIGMA_TOKEN or FIGMA_ACCESS_TOKEN must be configured on the OpenClaw host.");
+    throw new ConnectorProbeError(
+      "credentials",
+      "FIGMA_TOKEN or FIGMA_ACCESS_TOKEN must be configured on the OpenClaw host.",
+    );
   }
 
   return {
