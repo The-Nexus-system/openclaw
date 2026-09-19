@@ -815,6 +815,57 @@
         "threads_manage_replies",
         "threads_manage_insights"
       ]
+    },
+    {
+      "id": "telegram-channel",
+      "provider": "Telegram",
+      "priority": 1,
+      "routes": [
+        "native-openclaw-channel",
+        "telegram-bot-api"
+      ],
+      "credentialEnv": [
+        "TELEGRAM_BOT_TOKEN"
+      ],
+      "optionalCredentialEnv": [
+        "TELEGRAM_OWNER_USER_ID"
+      ],
+      "targetCapabilities": [
+        "messages.receive",
+        "messages.send",
+        "groups.receive",
+        "groups.send",
+        "media.receive",
+        "media.send"
+      ],
+      "state": "planned",
+      "notes": [
+        "Use native OpenClaw Telegram channel. Prefer dmPolicy allowlist with explicit owner user IDs for durable private access."
+      ]
+    },
+    {
+      "id": "whatsapp-channel",
+      "provider": "WhatsApp",
+      "priority": 1,
+      "routes": [
+        "native-openclaw-whatsapp-web",
+        "baileys-linked-session"
+      ],
+      "optionalCredentialEnv": [
+        "WHATSAPP_OWNER_NUMBER"
+      ],
+      "targetCapabilities": [
+        "messages.receive",
+        "messages.send",
+        "groups.receive",
+        "groups.send",
+        "media.receive",
+        "media.send"
+      ],
+      "state": "planned",
+      "notes": [
+        "Use native OpenClaw WhatsApp Web channel. Session credentials are linked runtime state rather than a normal API token and must be backed up privately/encrypted."
+      ]
     }
   ]
 }
