@@ -177,6 +177,16 @@ function safeHeaderValue(value: string, field: string): string {
   return value.trim();
 }
 
+class ConnectorProbeError extends Error {
+  constructor(
+    public readonly phase: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ConnectorProbeError";
+  }
+}
+
 async function getMicrosoftAccessToken(requiredScopes: string[] = []): Promise<string> {
   const clientId = process.env.MICROSOFT_CLIENT_ID;
   const refreshToken = process.env.MICROSOFT_REFRESH_TOKEN;
@@ -226,7 +236,10 @@ async function getMicrosoftAccessToken(requiredScopes: string[] = []): Promise<s
   try {
     body = text ? JSON.parse(text) : {};
   } catch {
-    throw new Error(`Microsoft token refresh returned non-JSON HTTP ${response.status}`);
+    throw new ConnectorProbeError(
+      "token-refresh",
+      `Microsoft token refresh returned non-JSON HTTP ${response.status}`,
+    );
   }
 
   if (!response.ok || !body.access_token) {
@@ -419,8 +432,8 @@ export default definePluginEntry({
         ]),
       }),
       async execute(_id, params) {
+        const checks: Array<{ name: string; ok: boolean; status: number }> = [];
         try {
-          const checks: Array<{ name: string; ok: boolean; status: number }> = [];
 
           if (params.connector === "github") {
             const token = process.env.GITHUB_TOKEN;
@@ -579,6 +592,7 @@ export default definePluginEntry({
                     connector: params.connector,
                     readVerified: false,
                     phase,
+                    checks,
                     error: message,
                   },
                   null,
