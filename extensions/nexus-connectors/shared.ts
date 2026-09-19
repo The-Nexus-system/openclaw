@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { getConnectorSecret, setConnectorSecret } from "./connector-secrets.js";
+import { getConnectorSecret, getRotatingConnectorSecret, setConnectorSecret } from "./connector-secrets.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -111,7 +111,7 @@ export function sleep(ms: number): Promise<void> {
 export async function getGoogleAccessToken(): Promise<string> {
   const clientId = getConnectorSecret("GOOGLE_CLIENT_ID");
   const clientSecret = getConnectorSecret("GOOGLE_CLIENT_SECRET");
-  const refreshToken = getConnectorSecret("GOOGLE_REFRESH_TOKEN");
+  const refreshToken = getRotatingConnectorSecret("GOOGLE_REFRESH_TOKEN");
 
   if (!clientId || !clientSecret || !refreshToken) {
     throw new Error(
@@ -192,7 +192,7 @@ export class ConnectorProbeError extends Error {
 
 export async function getMicrosoftAccessToken(requiredScopes: string[] = []): Promise<string> {
   const clientId = getConnectorSecret("MICROSOFT_CLIENT_ID");
-  const refreshToken = getConnectorSecret("MICROSOFT_REFRESH_TOKEN");
+  const refreshToken = getRotatingConnectorSecret("MICROSOFT_REFRESH_TOKEN");
   const tenant = getConnectorSecret("MICROSOFT_TENANT_ID")?.trim() || "common";
   const clientSecret = getConnectorSecret("MICROSOFT_CLIENT_SECRET");
   const configuredScopes =
@@ -254,6 +254,10 @@ export async function getMicrosoftAccessToken(requiredScopes: string[] = []): Pr
     );
   }
 
+  if (body.refresh_token) {
+    setConnectorSecret("MICROSOFT_REFRESH_TOKEN", body.refresh_token);
+  }
+
   return body.access_token;
 }
 export async function getDropboxAccessToken(): Promise<string> {
@@ -262,7 +266,7 @@ export async function getDropboxAccessToken(): Promise<string> {
 
   const appKey = getConnectorSecret("DROPBOX_APP_KEY");
   const appSecret = getConnectorSecret("DROPBOX_APP_SECRET");
-  const refreshToken = getConnectorSecret("DROPBOX_REFRESH_TOKEN");
+  const refreshToken = getRotatingConnectorSecret("DROPBOX_REFRESH_TOKEN");
 
   if (!appKey || !appSecret || !refreshToken) {
     throw new ConnectorProbeError(
@@ -388,7 +392,7 @@ export async function getZoomAccessToken(): Promise<{ token: string; mode: "dire
   }
 
   const basic = Buffer.from(`${clientId}:${clientSecret}`, "utf8").toString("base64");
-  const refreshToken = getConnectorSecret("ZOOM_REFRESH_TOKEN");
+  const refreshToken = getRotatingConnectorSecret("ZOOM_REFRESH_TOKEN");
 
   if (refreshToken) {
     const response = await fetch(
@@ -570,7 +574,7 @@ export async function runExpoProjectRead(
 export async function getSpotifyAccessToken(): Promise<string> {
   const clientId = getConnectorSecret("SPOTIFY_CLIENT_ID");
   const clientSecret = getConnectorSecret("SPOTIFY_CLIENT_SECRET");
-  const refreshToken = getConnectorSecret("SPOTIFY_REFRESH_TOKEN");
+  const refreshToken = getRotatingConnectorSecret("SPOTIFY_REFRESH_TOKEN");
 
   if (!clientId || !clientSecret || !refreshToken) {
     throw new ConnectorProbeError(
